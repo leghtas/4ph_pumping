@@ -1007,6 +1007,13 @@ class Circuit(object):
 #        ax.plot(xVec, popt_x[-4]*xVec**3+popt_x[-5]*xVec**4, label='fit4')
 #        ax.legend()
         return res1, res2, fs, Xi2, Xi3, Xi4, coeff2
+        
+    def get_freqs_only(self, phi_ext_s_0=0, phi_ext_l_0=0):
+        res = self.get_normal_mode_frame(phi_ext_s_0=phi_ext_s_0,
+                                         phi_ext_l_0=phi_ext_l_0)
+        res1, res2, P, w2 = res
+        fs = np.sqrt(w2)/2/np.pi
+        return fs
 
     def get_normal_mode_frame(self, phi_ext_s_0=0, phi_ext_l_0=0):
         res1, U0 = self.get_U_matrix(phi_ext_s_0=phi_ext_s_0,
