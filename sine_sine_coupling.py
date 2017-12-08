@@ -22,14 +22,20 @@ pi = sc.pi
 hbar = sc.hbar
 h = sc.h
 
-wa = 2*pi*4e9  # res frequency (Hz/rad) HFSS 6.13
-wb = 2*pi*6.2e9  # res frequency (Hz/rad) HFSS 3.31
-wc = 2*pi*7.7445e9  # res frequency (Hz/rad) HFSS 7.3
-Za = 130.  # res impedance in Ohm (cavity)
-Zb = 130.  # res impedance in Ohm (qubit)
-Zc = 50.
-LJ1 = 1.0 * 15e-9  # Josephson inductance, each junction has 2*LJ
-LJ2 = 1.1 * 15e-9 * 1.0
+wa = 26253111758
+wb = 38405084434
+wc = 96817602398
+Zb = 100
+Za = 127
+Zc = 50
+LJ1 = 1.32e-08
+LJ2 = 1.32e-08
+SL = 1.453
+BL = 18.68
+SL0 = 2.4549
+BL0 = 0.127
+Ecoup = 9e-10
+
 # ECa = h*200*1e6
 # EJa = 40*ECa
 # ELa = EJa/1e4
@@ -40,10 +46,16 @@ ECc, ELc, EJ = circuit.get_E_from_w(wc, Zc, LJ1)
 na, nb, nc = 6, 6, 6
 eps = 0 * ECc/100
 c = circuit.Circuit(ECa, ELa, ECb, ELb, EJ1, EJ2, na, nb,
-                    ECc=ECc-eps, ELc=ELc, Ecoup=12*ECa+eps, nc=nc,
+                    ECc=ECc, ELc=ELc, Ecoup=Ecoup, nc=nc,
                     printParams=True)
 
-phi_ext_sweep = np.linspace(pi-2*pi/10, pi+2*pi/10, 101)
+filename_buffer = r'spec_VNA_in3outB_sweepDC_follow_spec_mem_004_spec_buff2.dat.npy'
+buffer_data = np.load(folder+filename_buffer)
+buffer_flux = buffer_data[0]
+buffer_freq = buffer_data[1]
+
+
+phi_ext_sweep = buffer_flux
 phiVec = np.linspace(-4*0.5*2*pi, 4*0.5*2*pi, 101)
 ng_sweep = np.linspace(-1, 1, 21)
 
@@ -57,10 +69,12 @@ resz = np.zeros(len(phi_ext_sweep))
 gradUval = np.zeros(len(phi_ext_sweep))
 gradUval_ = np.zeros(len(phi_ext_sweep))
 
+
+
 if 1==1:
-    for kk, phi_ext in enumerate(phi_ext_sweep):
-        res1, res2, fs, fs_diff, Xi3s, Xi4s, coeff = c.get_freqs_kerrs(phi_ext_s_0=1*phi_ext,
-                                                              phi_ext_l_0=12*phi_ext+pi/4)
+    for kk, xx in enumerate(buffer_flux):
+        res1, res2, fs, fs_diff, Xi3s, Xi4s, coeff = c.get_freqs_kerrs(phi_ext_s_0=SL*(xx+SL0),
+                                                                       phi_ext_l_0=BL*(xx+BL0))
         f[:, kk] = np.sort(fs)
         k[:, kk]= np.sort(fs_diff[2:])
         Xi3[:, kk] = Xi3s
@@ -99,24 +113,25 @@ if 1==0:
     ax.plot(phi_ext_sweep, taylor,  'o')
 
 if 1==1:
-    fig, ax = plt.subplots(3, 3, figsize=(16,8))
+    fig, ax = plt.subplots(3, 3, figsize=(16,8), sharex=True)
 #    ax[0].plot(phi_ext_sweep/np.pi, resx/np.pi)
 #    ax[0].plot(phi_ext_sweep/np.pi, resy/np.pi)
 #    ax[0].plot(phi_ext_sweep/np.pi, resz/np.pi)
-    ax[0,0].plot(phi_ext_sweep/2/np.pi, f[0,:]/1e9)
-    ax[1,0].plot(phi_ext_sweep/2/np.pi, f[1,:]/1e9)
-    ax[2,0].plot(phi_ext_sweep/2/np.pi, f[2,:]/1e9)
-    ax[0,0].plot(phi_ext_sweep/2/np.pi, k[0,:]/1e9)
-    ax[1,0].plot(phi_ext_sweep/2/np.pi, k[1,:]/1e9)
-    ax[2,0].plot(phi_ext_sweep/2/np.pi, k[2,:]/1e9)
-    ax[0,1].plot(phi_ext_sweep/2/np.pi, Xi3[0,:]/1e6)
-    ax[0,1].plot(phi_ext_sweep/2/np.pi, Xi3[2,:]/1e6)
-    ax[1,1].plot(phi_ext_sweep/2/np.pi, Xi3[1,:]/1e6)
-    ax[1,1].plot(phi_ext_sweep/2/np.pi, Xi3[3,:]/1e6)
-    ax[0,2].plot(phi_ext_sweep/2/np.pi, Xi4[0,:]/1e6)
-    ax[0,2].plot(phi_ext_sweep/2/np.pi, Xi4[2,:]/1e6)
-    ax[1,2].plot(phi_ext_sweep/2/np.pi, Xi4[1,:]/1e6)
-    ax[1,2].plot(phi_ext_sweep/2/np.pi, Xi4[3,:]/1e6)
+    ax[0,0].plot(phi_ext_sweep*BL/2/pi, f[0,:]/1e9)
+    ax[1,0].plot(phi_ext_sweep*BL/2/pi, f[1,:]/1e9)
+    ax[1,0].plot(phi_ext_sweep*BL/2/pi, buffer_freq/1e9, 'o')
+    
+    ax[2,0].plot(phi_ext_sweep*BL/2/pi, f[2,:]/1e9)
+    ax[0,0].plot(phi_ext_sweep*BL/2/pi, k[0,:]/1e9)
+    ax[1,0].plot(phi_ext_sweep*BL/2/pi, k[1,:]/1e9)
+    ax[2,0].plot(phi_ext_sweep*BL/2/pi, k[2,:]/1e9)
+    ax[0,1].plot(phi_ext_sweep*BL/2/pi, Xi3[0,:]/1e6)
+    ax[0,1].plot(phi_ext_sweep*BL/2/pi, Xi3[2,:]/1e6)
+    ax[1,1].plot(phi_ext_sweep*BL/2/pi, Xi3[1,:]/1e6)
+    ax[1,1].plot(phi_ext_sweep*BL/2/pi, Xi3[3,:]/1e6)
+    ax[0,2].plot(phi_ext_sweep*BL/2/pi, Xi4[0,:]/1e6)
+    ax[0,2].plot(phi_ext_sweep*BL/2/pi, Xi4[2,:]/1e6)
+    ax[1,2].plot(phi_ext_sweep*BL/2/pi, Xi4[1,:]/1e6)
 
     ax[0,0].set_title('frequency (GHz)')
     ax[0,1].set_title('Xi3 (MHz)')
@@ -234,7 +249,7 @@ if 1==0:
 
 
 fig, ax = plt.subplots()
-ax.plot(phi_ext_sweep/2/np.pi, f[0,:]/1e9, color='blue')
+ax.plot(x, f[0,:]/1e9, color='blue')
 ax.set_xlabel('flux (/2pi)')
 ax.set_ylabel('frequency (GHz)')
 #fa = []
