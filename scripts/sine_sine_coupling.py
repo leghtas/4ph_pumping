@@ -40,7 +40,7 @@ c = codd.CircuitOddCoupling(ECa, ELa, ECb, ELb, EJ1, EJ2,
                             ECc=ECc, ELc=ELc, Ecoup=Ecoup,
                             printParams=True)
 
-folder = 'data/qubit_protex/'
+folder = '../data/qubit_protex/analyzed_data/'
 filename_buffer = r'spec_VNA_in3outB_sweepDC_follow_spec_mem_004_spec_buff2.dat.npy'
 buffer_data = np.load(folder+filename_buffer)
 buffer_flux = buffer_data[0]

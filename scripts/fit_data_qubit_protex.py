@@ -114,11 +114,12 @@ if 1==1:
         model = get_fb(x, params)
         return (data-model)
 
-if 1==0: ## LOAD DATA ##
-    folder = r'data/qubit_protex/'
+if 1==1: ## LOAD DATA ##
+    folder_root = r'../data/qubit_protex/'
+    folder_data = folder_root + r'analyzed_data/'
 
     filename_buffer = r'spec_VNA_in3outB_sweepDC_follow_spec_mem_004_spec_buff2.dat.npy'
-    buffer_data = np.load(folder+filename_buffer)
+    buffer_data = np.load(folder_data+filename_buffer)
     buffer_flux = buffer_data[0]
     buffer_freq = buffer_data[1]
     
@@ -126,7 +127,7 @@ if 1==0: ## LOAD DATA ##
     buffer_freq = np.concatenate((buffer_data[1][40:80],buffer_data[1][255:290]))
 
     filename_mem = r'spec_VNA_in3outB_sweepDC_follow_spec_mem_004_spec_mem2.dat.npy'
-    mem_data = np.load(folder+filename_mem)
+    mem_data = np.load(folder_data+filename_mem)
     mem_flux = mem_data[0]
     mem_freq = mem_data[1]
 #    
@@ -165,7 +166,8 @@ if 1==0: ## LOAD DATA ##
                
 
 
-if 1==0: # FIT BUFFER
+if 1==1: # FIT BUFFER
+    folder_img = folder_root + r'figures/'
     params = Parameters()
     
     wa = 26253111758
@@ -219,14 +221,15 @@ if 1==0: # FIT BUFFER
         ax.plot(x, get_fb(x, outb.params)/1e9,linewidth=2.0, label='theory')
     else:
         ax.plot(x, get_fb(x, params)/1e9, label='guess')
-    ax.plot([min(buffer_flux), max(buffer_flux)], outb.params['wb']/2/np.pi/1e9*np.ones((2)), label = 'wb')
+#    ax.plot([min(buffer_flux), max(buffer_flux)], outb.params['wb']/2/np.pi/1e9*np.ones((2)), label = 'wb')
     ax.set_xlabel('Voltage (V)', fontsize=fs)
     ax.set_ylabel('Frequency (GHz)', fontsize=fs)
     ax.set_title('Buffer mode spectroscopy', fontsize=fs)
     ax.legend(fontsize=fs)
-    plt.savefig('spec_buff.pdf')
+    plt.savefig(folder_img+'spec_buff.pdf')
     
-if 1==0: # FIT MEMORY #
+if 1==1: # FIT MEMORY #
+    folder_img = folder_root + r'figures/'
     params = Parameters()
     params.add('wa', value=wa, vary=True)
     params.add('wb', value=outb.params['wb'] if iffit else wb, vary=False)
@@ -259,13 +262,15 @@ if 1==0: # FIT MEMORY #
     ax.set_ylabel('Frequency (GHz)', fontsize=fs)
     ax.set_title('Memory mode spectroscopy', fontsize=fs)
     ax.legend(fontsize=fs)
-    plt.savefig('spec_mem.pdf')
+    plt.savefig(folder_img+'spec_mem.pdf')
 
-if 1==0: # PLOT BOTH ON SAME PLOT
+if 1==1: # PLOT BOTH ON SAME PLOT
+    folder_img = folder_root + r'figures/'
     fig, ax = plt.subplots(2,figsize=(18,20))
     ax[0].scatter(buffer_flux*3e-2, buffer_freq/1e9,marker = 'o', color = 'green', edgecolors = 'green', label='data')
 #    ax.plot(x, get_fa(x, params)/1e9, label='guess')
-    ax[0].plot(buffer_flux*3e-2, get_fb(buffer_flux, outb.params)/1e9, color = 'gray', linewidth=2.0, label='theory')
+    if 'outb' in locals():
+        ax[0].plot(buffer_flux*3e-2, get_fb(buffer_flux, outb.params)/1e9, color = 'gray', linewidth=2.0, label='theory')
     ax[0].set_ylabel('Frequency (GHz)', fontsize=fs)
     ax[0].set_title('Buffer mode spectroscopy', fontsize=fs)
     ax[0].legend(fontsize=fs)
@@ -273,12 +278,13 @@ if 1==0: # PLOT BOTH ON SAME PLOT
     _mem_flux = np.linspace(mem_flux[0], mem_flux[-1], 10*len(mem_flux))
     ax[1].scatter(mem_flux*3e-2, mem_freq/1e9,marker = 'o', color = 'r', edgecolors = 'red')
 #    ax.plot(x, get_fa(x, params)/1e9, label='guess')
-    ax[1].plot(_mem_flux*3e-2, get_fa(_mem_flux, outb.params)/1e9, color = 'grey',linewidth=2.0)
+    if 'outb' in locals():
+        ax[1].plot(_mem_flux*3e-2, get_fa(_mem_flux, outb.params)/1e9, color = 'grey',linewidth=2.0)
     ax[1].set_xlabel('Current (mA)', fontsize=fs)
     ax[1].set_ylabel('Frequency (GHz)', fontsize=fs)
     ax[1].set_title('Memory mode spectroscopy', fontsize=fs)
     ax[1].legend(fontsize=fs)
-    plt.savefig('spec_buff_mem.pdf')
+    plt.savefig(folder_img + 'spec_buff_mem.pdf')
 
 if 1==0: # EFFECT on wa=f(wb)
     fig, ax = plt.subplots(1, figsize =(12, 12))
