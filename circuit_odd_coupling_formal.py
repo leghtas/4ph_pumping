@@ -15,6 +15,7 @@ from scipy.optimize import minimize, least_squares
 import numdifftools as nd
 from scipy.misc import derivative
 from circuit import *
+import sympy as sp
 
 
 class CircuitOddCoupling(Circuit):
@@ -88,6 +89,20 @@ class CircuitOddCoupling(Circuit):
             print("kappab/kappaa limited by CJ = "+str(1/kappaa_over_kappab))
 
     def get_U(self, phi_ext_s_0=0, phi_ext_l_0=0):
+        def U(p, P=np.identity(3)):
+            p = P.dot(p)
+            (pa, pb, pc) = (p[0], p[1], p[2])
+            _U = 0.5*(self.ELa/hbar)*pa**2 + \
+                 0.5*(self.ELb/hbar)*pb**2 + \
+                 0.5*(self.ELc/hbar)*pc**2 + \
+                 -(self.EJ/hbar)*np.cos(phi_ext_s_0/2) * \
+                 np.cos(pa+pb+phi_ext_s_0/2+phi_ext_l_0) + \
+                 -(self.dEJ/hbar)*np.sin(phi_ext_s_0/2) * \
+                 np.sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
+            return _U
+        return U
+    
+    def get_U_formal(self, phi_ext_s_0=0, phi_ext_l_0=0):
         def U(p, P=np.identity(3)):
             p = P.dot(p)
             (pa, pb, pc) = (p[0], p[1], p[2])

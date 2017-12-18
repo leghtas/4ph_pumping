@@ -16,6 +16,8 @@ from scipy.misc import factorial
 from lmfit import minimize, Parameters
 import scipy.ndimage.filters as flt
 import matplotlib
+import matplotlib.gridspec as gridspec
+
 
 plt.close('all')
 iffit = False
@@ -65,6 +67,7 @@ SL0 = 2.4549
 BL0 = 0.127
 Ecoup = 9e-10
 
+
 if 1==1:
     def get_freqs_from_vals(x, params):
         print('eval')
@@ -111,37 +114,93 @@ if 1==1:
         model = get_fb(x, params)
         return (data-model)
 
-if 1==1: ## LOAD DATA ##
+if 1==0: ## LOAD DATA ##
     folder = r'data/qubit_protex/'
 
     filename_buffer = r'spec_VNA_in3outB_sweepDC_follow_spec_mem_004_spec_buff2.dat.npy'
     buffer_data = np.load(folder+filename_buffer)
     buffer_flux = buffer_data[0]
     buffer_freq = buffer_data[1]
+    
+    buffer_flux = np.concatenate((buffer_data[0][40:80],buffer_data[0][255:290]))
+    buffer_freq = np.concatenate((buffer_data[1][40:80],buffer_data[1][255:290]))
 
     filename_mem = r'spec_VNA_in3outB_sweepDC_follow_spec_mem_004_spec_mem2.dat.npy'
     mem_data = np.load(folder+filename_mem)
     mem_flux = mem_data[0]
     mem_freq = mem_data[1]
+#    
+    mem_flux = np.concatenate((mem_data[0][31:64],mem_data[0][198:225]))
+    mem_freq = np.concatenate((mem_data[1][31:64],mem_data[1][198:225]))
 
-    if 1==0:
-        fig, ax = plt.subplots(2)
-        ax[0].plot(mem_flux, mem_freq/1e9, 'o')
-        ax[1].plot(buffer_flux, buffer_freq/1e9, 'o')
-        ax[1].set_xlabel('DC (V)')
-        ax[0].set_ylabel('mem freq (GHz)')
-        ax[1].set_ylabel('buff freq (GHz)')
+    if 1==1:
+        fig = plt.figure(figsize = (15,15))
+        gs = gridspec.GridSpec(2, 2)
+        ax1 = fig.add_subplot(gs[0, 0])
+        ax2 = fig.add_subplot(gs[1, 0])
+        ax1.plot(mem_flux, mem_freq/1e9, 'o')
+        ax2.plot(buffer_flux, buffer_freq/1e9, 'o')
+        ax2.set_xlabel('DC (V)')
+        ax1.set_ylabel('mem freq (GHz)')
+        ax2.set_ylabel('buff freq (GHz)')
+        ax3 = fig.add_subplot(gs[:, 1])
+        jj = 0
+        mem_freqs = []
+        buffer_freqs = []
+        for ii in range(len(buffer_flux)):
+            if jj<len(mem_flux) and mem_flux[jj]==buffer_flux[ii]:
+                mem_freqs.append(mem_freq[jj]/1e9)
+                buffer_freqs.append(buffer_freq[ii]/1e9)
+                jj+=1
+                
+        mem_freqs = [x for _,x in sorted(zip(buffer_freqs,mem_freqs))]
+        buffer_freqs = [x for _,x in sorted(zip(buffer_freqs,buffer_freqs))]
+        ax3.scatter(buffer_freqs, mem_freqs)
+        
+        coefs = np.polyfit(buffer_freqs, mem_freqs, 3)
+        freqs = np.linspace(min(buffer_freqs), max(buffer_freqs), 50)
+        ax3.plot(freqs, np.polyval(coefs, freqs))
+        ax3.set_xlabel('Memory frequency')
+        ax3.set_ylabel('Buffer frequency')    
+               
 
 
-if 1==1: # FIT BUFFER
+if 1==0: # FIT BUFFER
     params = Parameters()
+    
+    wa = 26253111758
+    wb = 38407337530
+    wc = 96817602398
+    Zb = 100
+    Za = 127
+    LJ1 = 1.318e-08
+    LJ2 = 1.318e-08
+    SL = 1.47
+    BL = 18.85
+    SL0 = 2.41
+    BL0 = 0.12084
+    Ecoup = 9e-10
+    
+    wa = 26294488130
+    wb = 38398830335
+    wc = 96817602398
+    Zb = 76
+    Za = 98
+    LJ1 = 9.822e-09
+    LJ2 = 9.7489e-09
+    SL = 1.4709
+    BL = 18.804
+    SL0 = 2.4130
+    BL0 = 0.12590
+    Ecoup = 9e-10
+    
     params.add('wa', value=wa, vary=False)
-    params.add('wb', value=wb, vary=True)
+    params.add('wb', value=wb, vary=False)
     params.add('wc', value=wc, vary=False)
     params.add('Zb', Zb, vary=False)
     params.add('Za', Za, vary=False)
     params.add('LJ1', value=LJ1, vary=True)
-    params.add('LJ2', value=LJ2, expr='LJ1', vary=True)
+    params.add('LJ2', value=LJ2, vary = True)#expr='LJ1', vary=True)
     params.add('SL', value=SL, vary=True)
     params.add('BL', value=BL, vary=True)
     params.add('SL0', value=SL0, vary=True)
@@ -160,13 +219,14 @@ if 1==1: # FIT BUFFER
         ax.plot(x, get_fb(x, outb.params)/1e9,linewidth=2.0, label='theory')
     else:
         ax.plot(x, get_fb(x, params)/1e9, label='guess')
+    ax.plot([min(buffer_flux), max(buffer_flux)], outb.params['wb']/2/np.pi/1e9*np.ones((2)), label = 'wb')
     ax.set_xlabel('Voltage (V)', fontsize=fs)
     ax.set_ylabel('Frequency (GHz)', fontsize=fs)
     ax.set_title('Buffer mode spectroscopy', fontsize=fs)
     ax.legend(fontsize=fs)
     plt.savefig('spec_buff.pdf')
     
-if 1==1: # FIT MEMORY #
+if 1==0: # FIT MEMORY #
     params = Parameters()
     params.add('wa', value=wa, vary=True)
     params.add('wb', value=outb.params['wb'] if iffit else wb, vary=False)
@@ -213,21 +273,62 @@ if 1==0: # PLOT BOTH ON SAME PLOT
     _mem_flux = np.linspace(mem_flux[0], mem_flux[-1], 10*len(mem_flux))
     ax[1].scatter(mem_flux*3e-2, mem_freq/1e9,marker = 'o', color = 'r', edgecolors = 'red')
 #    ax.plot(x, get_fa(x, params)/1e9, label='guess')
-    ax[1].plot(_mem_flux*3e-2, get_fa(_mem_flux, outa.params)/1e9, color = 'grey',linewidth=2.0)
+    ax[1].plot(_mem_flux*3e-2, get_fa(_mem_flux, outb.params)/1e9, color = 'grey',linewidth=2.0)
     ax[1].set_xlabel('Current (mA)', fontsize=fs)
     ax[1].set_ylabel('Frequency (GHz)', fontsize=fs)
     ax[1].set_title('Memory mode spectroscopy', fontsize=fs)
     ax[1].legend(fontsize=fs)
     plt.savefig('spec_buff_mem.pdf')
+
+if 1==0: # EFFECT on wa=f(wb)
+    fig, ax = plt.subplots(1, figsize =(12, 12))
+    fluxes = np.linspace(-10,10, 1000)
     
-if 1==1: # PRINT
+    wa = 26294488130
+    wb = 38398830335
+    wc = 96817602398
+    Zb = 76
+    Za = 98
+    LJ1 = 9.822e-09
+    LJ2 = 9.7489e-09
+    SL = 1.4709
+    BL = 18.804
+    SL0 = 2.4130
+    BL0 = 0.12590
+    Ecoup = 9e-10
+    
+    params.add('wa', value=wa, vary=False)
+    params.add('wb', value=wb, vary=False)
+    params.add('wc', value=wc, vary=False)
+    params.add('Zb', Zb, vary=False)
+    params.add('Za', Za, vary=False)
+    params.add('LJ1', value=LJ1, vary=True)
+    params.add('LJ2', value=LJ2, vary = True)#expr='LJ1', vary=True)
+    params.add('SL', value=SL, vary=True)
+    params.add('BL', value=BL, vary=True)
+    params.add('SL0', value=SL0, vary=True)
+    params.add('BL0', value=BL0, vary=True)
+    params.add('Ecoup', value=Ecoup, vary=False)
+    
+    for factor in np.linspace(0.1, 1, 5):
+        params.add('Zb', value=Zb*factor, vary=True)
+        params.add('Za', value=Za*factor, vary=True)
+        fs = get_freqs_from_vals(fluxes, params)/1e9
+        fb = fs[1]
+        fa = fs[0]
+        ax.scatter(fb, fa, 10)
+        ax.scatter([min(fb), max(fb)], [min(fa), max(fa)], 30)
+#    ax.scatter(buffer_freqs, mem_freqs)
+    
+    
+if 1==0: # PRINT
     print('wa/2pi = %s GHz' % float(outa.params['wa'].value/2/np.pi/1e9))
     print('wb/2pi = %s GHz' % float(outb.params['wb'].value/2/np.pi/1e9))
     print('LJ (total at 0 flux) = %s nH' % float(outb.params['LJ1'].value/1e-9))
     print('Za = %s Ohm' % float(outa.params['Za'].value))
     print('Zb = %s Ohm' % float(outa.params['Zb'].value))
     
-if 1==1: # sweep LJ error
+if 1==0: # sweep LJ error
     params = Parameters()
     params.add('wa', value=outa.params['wa'])
     params.add('wb', value=outb.params['wb'])

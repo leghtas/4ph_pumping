@@ -9,18 +9,13 @@ import scipy.constants as sc
 import numpy as np
 import matplotlib.pyplot as plt
 import circuit
+import circuit_odd_coupling as codd
 import scipy.linalg as sl
 import numpy.linalg as nl
 import numdifftools as nd
 from scipy.misc import factorial
 
 plt.close('all')
-Phi0 = sc.value('mag. flux quantum')
-e = sc.elementary_charge
-phi0 = Phi0/2/np.pi  # Phi_0=h/(2*e)
-pi = sc.pi
-hbar = sc.hbar
-h = sc.h
 
 wa = 26253111758
 wb = 38405084434
@@ -36,19 +31,16 @@ SL0 = 2.4549
 BL0 = 0.127
 Ecoup = 9e-10
 
-# ECa = h*200*1e6
-# EJa = 40*ECa
-# ELa = EJa/1e4
-# wa, Za, LJ = circuit.get_w_Z_LJ_from_E(EC, EJ, EL)
 ECa, ELa, EJ1 = circuit.get_E_from_w(wa, Za, LJ1)
 ECb, ELb, EJ2 = circuit.get_E_from_w(wb, Zb, LJ2)
 ECc, ELc, EJ = circuit.get_E_from_w(wc, Zc, LJ1)
-na, nb, nc = 6, 6, 6
-eps = 0 * ECc/100
-c = circuit.Circuit(ECa, ELa, ECb, ELb, EJ1, EJ2, na, nb,
-                    ECc=ECc, ELc=ELc, Ecoup=Ecoup, nc=nc,
-                    printParams=True)
 
+eps = 0 * ECc/100
+c = codd.CircuitOddCoupling(ECa, ELa, ECb, ELb, EJ1, EJ2,
+                            ECc=ECc, ELc=ELc, Ecoup=Ecoup,
+                            printParams=True)
+
+folder = 'data/qubit_protex/'
 filename_buffer = r'spec_VNA_in3outB_sweepDC_follow_spec_mem_004_spec_buff2.dat.npy'
 buffer_data = np.load(folder+filename_buffer)
 buffer_flux = buffer_data[0]
@@ -68,12 +60,13 @@ resy = np.zeros(len(phi_ext_sweep))
 resz = np.zeros(len(phi_ext_sweep))
 gradUval = np.zeros(len(phi_ext_sweep))
 gradUval_ = np.zeros(len(phi_ext_sweep))
+Xi22 = np.zeros(len(phi_ext_sweep))
 
 
-
+# Get freqs and Kerrs v.s. flux
 if 1==1:
     for kk, xx in enumerate(buffer_flux):
-        res1, res2, fs, fs_diff, Xi3s, Xi4s, coeff = c.get_freqs_kerrs(phi_ext_s_0=SL*(xx+SL0),
+        res1, res2, fs, fs_diff, Xi3s, Xi4s, coeff, _Xi22 = c.get_freqs_kerrs(phi_ext_s_0=SL*(xx+SL0),
                                                                        phi_ext_l_0=BL*(xx+BL0))
         f[:, kk] = np.sort(fs)
         k[:, kk]= np.sort(fs_diff[2:])
@@ -82,36 +75,9 @@ if 1==1:
         resx[kk] = res1[0]
         resy[kk] = res1[1]
         resz[kk] = res1[2]
+        Xi22[kk] = _Xi22
 
-if 1==0:
-    U = c.get_U(phi_ext_s_0=0, phi_ext_l_0=np.pi)
-    res = c.get_normal_mode_frame(phi_ext_s_0=0, phi_ext_l_0=np.pi)
-    res1, res2, P, w2 = res
-    [x0, y0, z0] = (nl.inv(P)).dot([res1[0], res1[1], res1[2]])
-    Ux = lambda x : U([x+x0, y0, z0], P=P)
-    Uy = lambda y : U([x0, y+y0, z0], P=P)
-    Uz = lambda z : U([x0, y0, z+z0], P=P)
-    #
-    UxVec = np.zeros(len(phi_ext_sweep))
-    UyVec = np.zeros(len(phi_ext_sweep))
-    UzVec = np.zeros(len(phi_ext_sweep))
-    for ii, pp in enumerate(phi_ext_sweep):
-        UxVec[ii], UyVec[ii], UzVec[ii]  = [Ux(pp), Uy(pp), Uz(pp)]
-
-    fig, ax = plt.subplots()
-    ax.plot(phi_ext_sweep, UxVec)
-    ax.plot(phi_ext_sweep, UyVec)
-    ax.plot(phi_ext_sweep, UzVec)
-    taylor = Ux(0) + \
-             nd.Derivative(Ux, n=2)(0)*(1/factorial(2))*(phi_ext_sweep)**2
-    ax.plot(phi_ext_sweep, taylor,  'o')
-    taylor = Uy(0) + \
-             nd.Derivative(Uy, n=2)(0)*(1/factorial(2))*(phi_ext_sweep)**2
-    ax.plot(phi_ext_sweep, taylor,  'o')
-    taylor = Uz(0) + \
-             nd.Derivative(Uz, n=2)(0)*(1/factorial(2))*(phi_ext_sweep)**2
-    ax.plot(phi_ext_sweep, taylor,  'o')
-
+# PLOT
 if 1==1:
     fig, ax = plt.subplots(3, 3, figsize=(16,8), sharex=True)
 #    ax[0].plot(phi_ext_sweep/np.pi, resx/np.pi)
@@ -121,10 +87,9 @@ if 1==1:
     ax[1,0].plot(phi_ext_sweep*BL/2/pi, f[1,:]/1e9)
     ax[1,0].plot(phi_ext_sweep*BL/2/pi, buffer_freq/1e9, 'o')
     
-    ax[2,0].plot(phi_ext_sweep*BL/2/pi, f[2,:]/1e9)
+    
     ax[0,0].plot(phi_ext_sweep*BL/2/pi, k[0,:]/1e9)
     ax[1,0].plot(phi_ext_sweep*BL/2/pi, k[1,:]/1e9)
-    ax[2,0].plot(phi_ext_sweep*BL/2/pi, k[2,:]/1e9)
     ax[0,1].plot(phi_ext_sweep*BL/2/pi, Xi3[0,:]/1e6)
     ax[0,1].plot(phi_ext_sweep*BL/2/pi, Xi3[2,:]/1e6)
     ax[1,1].plot(phi_ext_sweep*BL/2/pi, Xi3[1,:]/1e6)
@@ -138,10 +103,21 @@ if 1==1:
     ax[0,2].set_title('Kerr (MHz)')
     ax[0,0].set_ylabel('MEMORY')
     ax[1,0].set_ylabel('BUFFER')
-    ax[2,0].set_ylabel('READOUT')
-    ax[2,0].set_xlabel('flux (/2pi)')
+    
+    ax[2,0].set_xlabel('frequency (GHz)')
     ax[2,1].set_xlabel('flux (/2pi)')
     ax[2,2].set_xlabel('flux (/2pi)')
+    
+    fig2, ax2 = plt.subplots(2)
+    ax2[0].scatter(k[1,:]/1e9, k[0,:]/1e9, 10, label='0 photon')
+    ax2[0].scatter(k[1,:]/1e9+Xi4[3, :]/1e9, k[0,:]/1e9+Xi22[:]/1e9, 10, label='1 photon')
+    ax2[0].scatter(wb/2/pi/1e9, wa/2/pi/1e9, marker='x')
+    ax2[0].set_ylabel('MEMORY freq (GHz)')
+    ax2[0].set_xlabel('BUFFER freq (GHz)')
+    ax2[1].plot(phi_ext_sweep*BL/2/pi, k[1,:]/1e9, label='0 photon')
+    ax2[1].plot(phi_ext_sweep*BL/2/pi, k[1,:]/1e9+Xi4[3, :]/1e9, label='1 photon')
+    ax2[1].legend()
+    ax2[0].legend()
 
 if 1==0:
     Nx = 21
@@ -248,10 +224,6 @@ if 1==0:
     ax[2].set_ylabel('readout freq')
 
 
-fig, ax = plt.subplots()
-ax.plot(x, f[0,:]/1e9, color='blue')
-ax.set_xlabel('flux (/2pi)')
-ax.set_ylabel('frequency (GHz)')
 #fa = []
 #fb = []
 #
