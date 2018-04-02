@@ -100,7 +100,7 @@ class CircuitOddCoupling(Circuit):
                  np.sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
             return _U
         return U
-    
+
     def get_dUa(self, phi_ext_s_0=0, phi_ext_l_0=0):
         def dUa(p, P=np.identity(3)):
             p = P.dot(p)
@@ -112,7 +112,7 @@ class CircuitOddCoupling(Circuit):
                  np.cos(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
             return _dUa
         return dUa
-    
+
     def get_dUb(self, phi_ext_s_0=0, phi_ext_l_0=0):
         def dUb(p, P=np.identity(3)):
             p = P.dot(p)
@@ -124,7 +124,7 @@ class CircuitOddCoupling(Circuit):
                  np.cos(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
             return _dUb
         return dUb
-    
+
     def get_dUc(self, phi_ext_s_0=0, phi_ext_l_0=0):
         def dUc(p, P=np.identity(3)):
             p = P.dot(p)
@@ -132,7 +132,7 @@ class CircuitOddCoupling(Circuit):
             _dUc = (self.ELc/hbar)*pc
             return _dUc
         return dUc
-    
+
     def get_d2Uaa(self, phi_ext_s_0=0, phi_ext_l_0=0):
         def d2Uaa(p, P=np.identity(3)):
             p = P.dot(p)
@@ -144,7 +144,7 @@ class CircuitOddCoupling(Circuit):
                  np.sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
             return _d2Uaa
         return d2Uaa
-    
+
     def get_d2Ubb(self, phi_ext_s_0=0, phi_ext_l_0=0):
         def d2Ubb(p, P=np.identity(3)):
             p = P.dot(p)
@@ -156,7 +156,7 @@ class CircuitOddCoupling(Circuit):
                  np.sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
             return _d2Ubb
         return d2Ubb
-    
+
     def get_d2Ucc(self, phi_ext_s_0=0, phi_ext_l_0=0):
         def d2Ucc(p, P=np.identity(3)):
             p = P.dot(p)
@@ -164,7 +164,7 @@ class CircuitOddCoupling(Circuit):
             _d2Ucc = (self.ELc/hbar)
             return _d2Ucc
         return d2Ucc
-    
+
     def get_d2Uab(self, phi_ext_s_0=0, phi_ext_l_0=0):
         def d2Uab(p, P=np.identity(3)):
             p = P.dot(p)
@@ -175,7 +175,7 @@ class CircuitOddCoupling(Circuit):
                  np.sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
             return _d2Uab
         return d2Uab
-    
+
     def get_d2Uac(self, phi_ext_s_0=0, phi_ext_l_0=0):
         def d2Uac(p, P=np.identity(3)):
             p = P.dot(p)
@@ -183,7 +183,7 @@ class CircuitOddCoupling(Circuit):
             _d2Uac = 0
             return _d2Uac
         return d2Uac
-    
+
     def get_d2Ubc(self, phi_ext_s_0=0, phi_ext_l_0=0):
         def d2Ubc(p, P=np.identity(3)):
             p = P.dot(p)
@@ -191,7 +191,7 @@ class CircuitOddCoupling(Circuit):
             _d2Ubc = 0
             return _d2Ubc
         return d2Ubc
-    
+
     def get_HessU(self, phi_ext_s_0=0, phi_ext_l_0=0):
         def HessU(p, P=np.identity(3)):
             p = P.dot(p)
@@ -209,7 +209,7 @@ class CircuitOddCoupling(Circuit):
             d2Ubc_p = self.get_d2Ubc(phi_ext_s_0=phi_ext_s_0,
                                    phi_ext_l_0=phi_ext_l_0)([pa, pb, pc])
             _HessU = np.array([[d2Uaa_p, d2Uab_p, d2Uac_p],
-                               [d2Uab_p, d2Ubb_p, d2Ubc_p], 
+                               [d2Uab_p, d2Ubb_p, d2Ubc_p],
                                [d2Uac_p, d2Ubc_p, d2Ucc_p]])
             _HessU1 = np.transpose(np.dot(np.transpose(_HessU,(0,1)), P),(0,1))
             _HessU2 = np.transpose(np.dot(np.transpose(_HessU1,(1,0)), P),(1,0))
@@ -236,20 +236,20 @@ class CircuitOddCoupling(Circuit):
             d3U_p = self.get_d3U(phi_ext_s_0=phi_ext_s_0,
                                    phi_ext_l_0=phi_ext_l_0)([pa, pb, pc])
             _Hess3U = np.array([[[d3U_p, d3U_p, 0],
-                                 [d3U_p, d3U_p, 0], 
-                                 [0, 0, 0]], 
+                                 [d3U_p, d3U_p, 0],
+                                 [0, 0, 0]],
                                 [[d3U_p, d3U_p, 0],
-                                 [d3U_p, d3U_p, 0], 
+                                 [d3U_p, d3U_p, 0],
                                  [0, 0, 0]],
                                 [[0, 0, 0],
-                                 [0, 0, 0], 
+                                 [0, 0, 0],
                                  [0, 0, 0]]])
             _Hess3U1 = np.transpose(np.dot(np.transpose(_Hess3U,(0,1,2)), P),(0,1,2))
-            _Hess3U2 = np.transpose(np.dot(np.transpose(_Hess3U1,(1,0,2)), P),(1,0,2))
+            _Hess3U2 = np.transpose(np.dot(np.transpose(_Hess3U1,(0,2,1)), P),(0,2,1))
             _Hess3U3 = np.transpose(np.dot(np.transpose(_Hess3U2,(2,1,0)), P),(2,1,0))
             return _Hess3U3
         return Hess3U
-    
+
     def get_d4U(self, phi_ext_s_0=0, phi_ext_l_0=0):
         def d4U(p, P=np.identity(3)):
             p = P.dot(p)
@@ -268,35 +268,35 @@ class CircuitOddCoupling(Circuit):
             d4U_p = self.get_d4U(phi_ext_s_0=phi_ext_s_0,
                                    phi_ext_l_0=phi_ext_l_0)([pa, pb, pc])
             _Hess4U = np.array([[[[d4U_p, d4U_p, 0],
-                                  [d4U_p, d4U_p, 0], 
-                                  [0, 0, 0]], 
+                                  [d4U_p, d4U_p, 0],
+                                  [0, 0, 0]],
                                  [[d4U_p, d4U_p, 0],
-                                  [d4U_p, d4U_p, 0], 
+                                  [d4U_p, d4U_p, 0],
                                   [0, 0, 0]],
                                  [[0, 0, 0],
-                                  [0, 0, 0], 
+                                  [0, 0, 0],
                                   [0, 0, 0]]],
                                 [[[d4U_p, d4U_p, 0],
-                                  [d4U_p, d4U_p, 0], 
-                                  [0, 0, 0]], 
+                                  [d4U_p, d4U_p, 0],
+                                  [0, 0, 0]],
                                  [[d4U_p, d4U_p, 0],
-                                  [d4U_p, d4U_p, 0], 
+                                  [d4U_p, d4U_p, 0],
                                   [0, 0, 0]],
                                  [[0, 0, 0],
-                                  [0, 0, 0], 
-                                  [0, 0, 0]]], 
+                                  [0, 0, 0],
+                                  [0, 0, 0]]],
                                 [[[0, 0, 0],
-                                  [0, 0, 0], 
-                                  [0, 0, 0]], 
-                                 [[0, 0, 0],
-                                  [0, 0, 0], 
+                                  [0, 0, 0],
                                   [0, 0, 0]],
                                  [[0, 0, 0],
-                                  [0, 0, 0], 
+                                  [0, 0, 0],
+                                  [0, 0, 0]],
+                                 [[0, 0, 0],
+                                  [0, 0, 0],
                                   [0, 0, 0]]]])
             _Hess4U1 = np.transpose(np.dot(np.transpose(_Hess4U,(0,1,2,3)), P),(0,1,2,3))
-            _Hess4U2 = np.transpose(np.dot(np.transpose(_Hess4U1,(1,0,2,3)), P),(1,0,2,3))
-            _Hess4U3 = np.transpose(np.dot(np.transpose(_Hess4U2,(2,1,0,3)), P),(2,1,0,3))
+            _Hess4U2 = np.transpose(np.dot(np.transpose(_Hess4U1,(0,1,3,2)), P),(0,1,3,2))
+            _Hess4U3 = np.transpose(np.dot(np.transpose(_Hess4U2,(0,3,2,1)), P),(0,3,2,1))
             _Hess4U4 = np.transpose(np.dot(np.transpose(_Hess4U3,(3,1,2,0)), P),(3,1,2,0))
             return _Hess4U4
         return Hess4U
@@ -311,7 +311,7 @@ class CircuitOddCoupling(Circuit):
                  (1/16.)*(hbar/self.Ecoup)*(dpa-dpc)**2
             return _T
         return T
-    
+
     def get_d2Taa(self, phi_ext_s_0=0, phi_ext_l_0=0):
         def d2Taa(dp, P=np.identity(3)):
             dp = P.dot(dp)
@@ -356,7 +356,7 @@ class CircuitOddCoupling(Circuit):
                                       phi_ext_l_0=phi_ext_l_0)([dpa, dpb, dpc])
             d2Tbc_dp = 0
             _HessT = np.array([[d2Taa_dp, d2Tab_dp, d2Tac_dp],
-                               [d2Tab_dp, d2Tbb_dp, d2Tbc_dp], 
+                               [d2Tab_dp, d2Tbb_dp, d2Tbc_dp],
                                [d2Tac_dp, d2Tbc_dp, d2Tcc_dp]])
             _HessT_basis = np.dot(np.dot(P.T, _HessT), P)
             return _HessT_basis
@@ -412,13 +412,13 @@ class CircuitOddCoupling(Circuit):
     def get_freqs_kerrs(self, phi_ext_s_0=0, phi_ext_l_0=0):
         res = self.get_normal_mode_frame(phi_ext_s_0=phi_ext_s_0,
                                          phi_ext_l_0=phi_ext_l_0)
-        res1, res2, P, w2 = res
+        res1, res2, P, pseudo_invP, w2 = res
         fs = np.sqrt(w2)/2/np.pi
 
         # calculate Kerrs from polynomial approximation of potential
         U = self.get_U(phi_ext_s_0=phi_ext_s_0,
                        phi_ext_l_0=phi_ext_l_0)
-        [x0, y0, z0] = (nl.inv(P)).dot([res1[0], res1[1], res1[2]])
+        [x0, y0, z0] = pseudo_invP.dot([res1[0], res1[1], res1[2]])
 
         HessU = self.get_HessU(phi_ext_s_0=phi_ext_s_0,
                                phi_ext_l_0=phi_ext_l_0)
@@ -429,10 +429,10 @@ class CircuitOddCoupling(Circuit):
         Hess_r = HessU([x0, y0, z0], P=P)
 #        print('Hess_r = ' + str(Hess_r/2))
 #        print('w2 = ' +str(np.diag(Hess_r/2)))
-        
-        Hess3_r = Hess3U([x0, y0, z0], P=P)       
-        Hess4_r = Hess4U([x0, y0, z0], P=P) 
-        
+
+        Hess3_r = Hess3U([x0, y0, z0], P=P)
+        Hess4_r = Hess4U([x0, y0, z0], P=P)
+
         Uxy = lambda x,y : U([x+x0, y+y0, z0], P=P)
 
         Ux = lambda x: U([x+x0, y0, z0], P=P)
@@ -519,11 +519,11 @@ class CircuitOddCoupling(Circuit):
 #        ax.plot(xVec, popt_x[-4]*xVec**3+popt_x[-5]*xVec**4, label='fit4')
 #        ax.legend()
         return res1, res2, fs, Xi2, Xi3, Xi4, coeff2, Xi22
-        
+
     def get_freqs_only(self, phi_ext_s_0=0, phi_ext_l_0=0):
         res = self.get_normal_mode_frame(phi_ext_s_0=phi_ext_s_0,
                                          phi_ext_l_0=phi_ext_l_0)
-        res1, res2, P, w2 = res
+        res1, res2, P, pseudo_invP, w2 = res
         fs = np.sqrt(w2)/2/np.pi
         return fs
 
@@ -541,5 +541,7 @@ class CircuitOddCoupling(Circuit):
         w2, v2 = nl.eigh(U2)
         P = np.dot(np.dot(v0, nl.inv(sqrtw)), v2)
         invP = np.dot(np.dot(nl.inv(v2), nl.inv(sqrtw)), nl.inv(v0))
+
+        pseudo_invP = np.dot(np.dot(nl.inv(v2), np.diag(w0**0.5)), nl.inv(v0))
         U3 = np.dot(np.dot(invP, U0), P)
-        return res1, res2, P, w2
+        return res1, res2, P, pseudo_invP, w2

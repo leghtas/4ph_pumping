@@ -10,39 +10,43 @@ import matplotlib.pyplot as plt
 import qutip as qt
 
 plt.close('all')
+plt.ion()
 
-solve1mode = True
-solve2mode = True
+solve1mode = False
+solve2mode = False
 solve3mode = True
 
-alpha0 = np.sqrt(2)*np.exp(1j*np.pi/2)
-g2 = 2 * np.pi * 1.
-Kerr = 0
+alpha0 = np.sqrt(6)*np.exp(1j*np.pi/2)
+g2 = 2 * np.pi * 6
+Kerr = 2 * np.pi * 0.050
 
 kappaa = 1. / 2.
-kappab = 2 * np.pi * 3.
-kappaphi = 0 * 2 * np.pi * 0.1
+kappab = 2 * np.pi * 20.
+chiab = 2 * np.pi *0.1
+kappaphi = 1 * 2 * np.pi * 0.2
 
 # 1 mode
 kappa2 = 4*g2**2/kappab  # MHz
 
 # 3 mode
-chi = 2 * np.pi * 3.
-nth = 0.1
-T1 = 15
+chi = 2 * np.pi * 1.
+nth = 0.2
+T1 = 10
 
-Na = 20
-Nb = 2
+Na = 25
+Nb = 3
 a = qt.destroy(Na)
 b = qt.destroy(Nb)
 
 H1 = -Kerr * a.dag()**2*a**2
 H2 = (qt.tensor(H1, qt.identity(Nb)) +
       g2*(qt.tensor((a**2-alpha0**2), b.dag()) +
-          qt.tensor((a.dag()**2-alpha0.conjugate()**2), b)))
-H3 = qt.tensor(H2, qt.identity(2)) + chi * qt.tensor(a.dag()*a, qt.identity(Nb), (qt.sigmaz()-qt.identity(2))/2)
+          qt.tensor((a.dag()**2-alpha0.conjugate()**2), b)) -
+      chiab*(qt.tensor(a.dag()*a, b.dag()*b)))
+H3 = qt.tensor(H2, qt.identity(2)) + chi * qt.tensor(a.dag()*a, qt.identity(Nb),
+               (qt.sigmaz()+qt.identity(2))/2)
 
-psi01 = qt.coherent(Na, 0*alpha0)
+psi01 = qt.coherent(Na, alpha0)
 ketalpha0 = qt.coherent(Na, alpha0)
 ketmalpha0 = qt.coherent(Na, -alpha0)
 
@@ -58,12 +62,25 @@ c_ops3 = [np.sqrt(kappaa)*qt.tensor(a, qt.identity(Nb), qt.identity(2)),
           np.sqrt(nth/T1)*qt.tensor(qt.identity(Na), qt.identity(Nb), qt.sigmap()),
           np.sqrt((1+nth)/T1)*qt.tensor(qt.identity(Na), qt.identity(Nb), qt.sigmam())]
 
-psi02 = qt.tensor(psi01, qt.basis(Nb, 0))
-psi03 = qt.tensor(psi01, qt.basis(Nb, 0), qt.basis(2,0))
+#
+Nwig = 101
+xvec = np.linspace(-3*np.abs(alpha0), 3*np.abs(alpha0), Nwig)
+dx = xvec[1]-xvec[0]
+#fig0, ax0 = plt.subplots()
+#rho_ss_3 = qt.steadystate(H3, c_ops3)
+#rhoa3 = rho_ss_3.ptrace(0)
+#W3 = qt.wigner(rhoa3, xvec, xvec)
+#ax0.pcolor(xvec, xvec, W3)
+#ax0.axis('equal')
 
-# T = 5/kappa2
-T = 5/kappa2
-dt = 1/kappa2/10.
+psi02 = qt.tensor(psi01, qt.basis(Nb, 0))
+psi03 = qt.tensor(psi01, qt.basis(Nb, 0), qt.basis(2,1))
+rho03 = qt.tensor(psi01*psi01.dag(), qt.basis(Nb, 0)*qt.basis(Nb, 0).dag(),
+                  qt.projection(2, 1, 1)*(1-nth)+qt.projection(2, 0, 0)*nth)
+
+#T = 5/kappa2
+T = 10
+dt = T/100.
 tlist = np.linspace(0, T, T/dt+1)
 if solve1mode:
     result = qt.mesolve(H1, psi01, tlist, c_ops1, [])
@@ -75,21 +92,31 @@ if solve1mode:
         alphat.append(qt.expect(result.states[ii], ketalpha0))
         malphat.append(qt.expect(result.states[ii], ketmalpha0))
 if solve2mode:
+    fock0 = qt.basis(Na, 0)
     result2 = qt.mesolve(H2, psi02, tlist, c_ops2, [])
+    pop0 = []
     at2 = []
     bt2 = []
     alphat2 = []
     malphat2 = []
+    popup = []
+    popdown = []
     for ii, t in enumerate(tlist):
         at2.append(qt.expect(qt.tensor(a**2, qt.identity(Nb)),
                              result2.states[ii]))
         bt2.append(qt.expect(qt.tensor(qt.identity(Na), b**2),
                              result2.states[ii]))
         rhoa = result2.states[ii].ptrace(0)
+        W2 = qt.wigner(rhoa, xvec, xvec)
+        dist = np.sum(W2, axis=1)*dx
+
+        popup.append(np.sum(dist[0:int(Nwig/2)+1])*dx)
+        popdown.append(np.sum(dist[int(Nwig/2)+1:-1])*dx)
         alphat2.append(qt.expect(rhoa, ketalpha0))
         malphat2.append(qt.expect(rhoa, ketmalpha0))
+        pop0.append(qt.expect(rhoa, fock0))
 if solve3mode:
-    result3 = qt.mesolve(H3, psi03, tlist, c_ops3, [])
+    result3 = qt.mesolve(H3, rho03, tlist, c_ops3, [])
     at3 = []
     bt3 = []
     alphat3 = []
@@ -103,11 +130,13 @@ if solve3mode:
         alphat3.append(qt.expect(rhoa, ketalpha0))
         malphat3.append(qt.expect(rhoa, ketmalpha0))
 
+
 fig, ax = plt.subplots()
 if solve1mode:
     ax.plot(tlist, np.real(at), label='real')
     ax.plot(tlist, np.imag(at), label='imag')
 if solve2mode:
+    ax.plot(tlist, pop0, label='pop0')
     ax.plot(tlist, np.real(at2), label='real a 2')
     ax.plot(tlist, np.imag(at2), label='imag a 2')
     ax.plot(tlist, np.real(bt2), label='real b 2')
@@ -125,6 +154,8 @@ if solve1mode:
 if solve2mode:
     ax2.plot(tlist, np.real(alphat2), label='two mode +alpha')
     ax2.plot(tlist, np.real(malphat2), label='two mode -alpha')
+    ax2.plot(tlist, popup, label='two mode popup')
+    ax2.plot(tlist, popdown, label='two mode popdown')
 if solve3mode:
     ax2.plot(tlist, np.real(alphat3), label='3 mode +alpha')
     ax2.plot(tlist, np.real(malphat3), label='3 mode -alpha')
@@ -133,17 +164,18 @@ ax2.set_xlabel('Time (us)')
 ax2.set_ylabel('proj on alpha')
 ax2.legend()
 
-xvec = np.linspace(-2*np.abs(alpha0), 2*np.abs(alpha0), 101)
-fig, ax = plt.subplots(3)
+fig3, ax3 = plt.subplots(3)
 if solve1mode:
     W = qt.wigner(result.states[-1], xvec, xvec)
-    ax[0].pcolor(xvec, xvec, W)
+    ax3[0].pcolor(xvec, xvec, W)
 if solve2mode:
     W2 = qt.wigner(qt.ptrace(result2.states[-1], 0), xvec, xvec)
-    ax[1].pcolor(xvec, xvec, W2)
+    ax3[1].pcolor(xvec, xvec, W2)
+
 if solve3mode:
     W3 = qt.wigner(qt.ptrace(result3.states[-1], 0), xvec, xvec)
-    ax[2].pcolor(xvec, xvec, W3)
-ax[0].axis('equal')
-ax[1].axis('equal')
-ax[2].axis('equal')
+    ax3[2].pcolor(xvec, xvec, W3)
+ax3[0].axis('equal')
+ax3[1].axis('equal')
+ax3[2].axis('equal')
+

@@ -48,7 +48,7 @@ buffer_freq = buffer_data[1]
 
 
 phi_ext_sweep = buffer_flux
-phiVec = np.linspace(-4*0.5*2*pi, 4*0.5*2*pi, 101)
+phiVec = np.linspace(-4*0.5*2*pi, 4*0.5*2*pi, 401)
 ng_sweep = np.linspace(-1, 1, 21)
 
 f = np.zeros((3, len(phi_ext_sweep)))
@@ -86,8 +86,8 @@ if 1==1:
     ax[0,0].plot(phi_ext_sweep*BL/2/pi, f[0,:]/1e9)
     ax[1,0].plot(phi_ext_sweep*BL/2/pi, f[1,:]/1e9)
     ax[1,0].plot(phi_ext_sweep*BL/2/pi, buffer_freq/1e9, 'o')
-    
-    
+
+
     ax[0,0].plot(phi_ext_sweep*BL/2/pi, k[0,:]/1e9)
     ax[1,0].plot(phi_ext_sweep*BL/2/pi, k[1,:]/1e9)
     ax[0,1].plot(phi_ext_sweep*BL/2/pi, Xi3[0,:]/1e6)
@@ -103,11 +103,11 @@ if 1==1:
     ax[0,2].set_title('Kerr (MHz)')
     ax[0,0].set_ylabel('MEMORY')
     ax[1,0].set_ylabel('BUFFER')
-    
+
     ax[2,0].set_xlabel('frequency (GHz)')
     ax[2,1].set_xlabel('flux (/2pi)')
     ax[2,2].set_xlabel('flux (/2pi)')
-    
+
     fig2, ax2 = plt.subplots(2)
     ax2[0].scatter(k[1,:]/1e9, k[0,:]/1e9, 10, label='0 photon')
     ax2[0].scatter(k[1,:]/1e9+Xi4[3, :]/1e9, k[0,:]/1e9+Xi22[:]/1e9, 10, label='1 photon')
