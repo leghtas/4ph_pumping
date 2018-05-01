@@ -13,32 +13,41 @@ plt.close('all')
 plt.ion()
 
 solve1mode = False
-solve2mode = False
-solve3mode = True
+solve2mode = True
+solve3mode = False
 
-alpha0 = np.sqrt(6)*np.exp(1j*np.pi/2)
-g2 = 2 * np.pi * 6
-Kerr = 2 * np.pi * 0.050
+alpha0 = np.sqrt(3)*np.exp(0*1j*np.pi/2)
+g2 = 2 * np.pi * 5.
+Kerr = 2 * np.pi * 0.18
 
 kappaa = 1. / 2.
-kappab = 2 * np.pi * 20.
-chiab = 2 * np.pi *0.1
-kappaphi = 1 * 2 * np.pi * 0.2
+kappab = 2 * np.pi * 3.
+kappaphi = 1 * 2 * np.pi * 0
 
 # 1 mode
 kappa2 = 4*g2**2/kappab  # MHz
 
 # 3 mode
-chi = 2 * np.pi * 1.
-nth = 0.2
-T1 = 10
+chi = 2 * np.pi * 3.
+nth = 0.03
+T1 = 15
 
-Na = 25
-Nb = 3
+Na = 20
+Nb = 10
 a = qt.destroy(Na)
 b = qt.destroy(Nb)
+Ia = qt.identity(Na)
+Ib = qt.identity(Nb)
 
-H1 = -Kerr * a.dag()**2*a**2
+
+def projg(rhoabq):
+    bra_g = qt.basis(2, 0).dag()
+    ket_g = qt.basis(2, 0)
+    rhoab = qt.tensor(Ia, Ib, bra_g) * rhoabq * qt.tensor(Ia, Ib, ket_g)
+    rhoab = rhoab/rhoab.tr()
+    return rhoab
+
+H1 = - (Kerr/2) * a.dag()**2*a**2
 H2 = (qt.tensor(H1, qt.identity(Nb)) +
       g2*(qt.tensor((a**2-alpha0**2), b.dag()) +
           qt.tensor((a.dag()**2-alpha0.conjugate()**2), b)) -
@@ -78,18 +87,22 @@ psi03 = qt.tensor(psi01, qt.basis(Nb, 0), qt.basis(2,1))
 rho03 = qt.tensor(psi01*psi01.dag(), qt.basis(Nb, 0)*qt.basis(Nb, 0).dag(),
                   qt.projection(2, 1, 1)*(1-nth)+qt.projection(2, 0, 0)*nth)
 
-#T = 5/kappa2
-T = 10
-dt = T/100.
+psi03 = qt.tensor(psi01, qt.basis(Nb, 0), qt.basis(2,0))
+
+# T = 5/kappa2
+T = 0.5#50/kappa2
+dt = T/200.
 tlist = np.linspace(0, T, T/dt+1)
 if solve1mode:
     result = qt.mesolve(H1, psi01, tlist, c_ops1, [])
     at = []
     alphat = []
+    p00 = []
     malphat = []
     for ii, t in enumerate(tlist):
         at.append(qt.expect(a**2, result.states[ii]))
         alphat.append(qt.expect(result.states[ii], ketalpha0))
+        p00.append(qt.expect(qt.projection(Na, 0, 0), result.states[ii]))
         malphat.append(qt.expect(result.states[ii], ketmalpha0))
 if solve2mode:
     fock0 = qt.basis(Na, 0)
@@ -97,6 +110,9 @@ if solve2mode:
     pop0 = []
     at2 = []
     bt2 = []
+    p00 = []
+    p11 = []
+    p22 = []
     alphat2 = []
     malphat2 = []
     popup = []
@@ -106,6 +122,15 @@ if solve2mode:
                              result2.states[ii]))
         bt2.append(qt.expect(qt.tensor(qt.identity(Na), b**2),
                              result2.states[ii]))
+        p00.append(qt.expect(qt.tensor(qt.projection(Na, 0, 0),
+                                       qt.identity(Nb)),
+                             result2.states[ii]))
+        p11.append(qt.expect(qt.tensor(qt.projection(Na, 1, 1),
+                               qt.identity(Nb)),
+                     result2.states[ii]))
+        p22.append(qt.expect(qt.tensor(qt.projection(Na, 2, 2),
+                               qt.identity(Nb)),
+                     result2.states[ii]))
         rhoa = result2.states[ii].ptrace(0)
         W2 = qt.wigner(rhoa, xvec, xvec)
         dist = np.sum(W2, axis=1)*dx
@@ -126,7 +151,8 @@ if solve3mode:
                              result3.states[ii]))
         bt3.append(qt.expect(qt.tensor(qt.identity(Na), b**2, qt.identity(2)),
                              result3.states[ii]))
-        rhoa = result3.states[ii].ptrace(0)
+
+        rhoa = (projg(result3.states[ii])).ptrace(0)
         alphat3.append(qt.expect(rhoa, ketalpha0))
         malphat3.append(qt.expect(rhoa, ketmalpha0))
 
@@ -141,6 +167,9 @@ if solve2mode:
     ax.plot(tlist, np.imag(at2), label='imag a 2')
     ax.plot(tlist, np.real(bt2), label='real b 2')
     ax.plot(tlist, np.imag(bt2), label='imag b 2')
+    ax.plot(tlist, p00, label='pop 0')
+    ax.plot(tlist, p11, label='pop 1')
+    ax.plot(tlist, p22, label='pop 2')
 if solve3mode:
     ax.plot(tlist, np.real(at3), label='3')
     ax.plot(tlist, np.real(bt3), label='3')
