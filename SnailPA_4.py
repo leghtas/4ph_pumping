@@ -20,19 +20,19 @@ plt.close('all')
 w = 8*1e9*2*np.pi
 Z = 50
 #LJ = 1.32e-08
-#I0 = 7.1*1e-6 #A EJ=phi0*I0
-LJ = 40e-12
+I0 = 7.1*1e-6 #A EJ=phi0*I0
+#LJ = 40e-12
 
 EC, EL, EJ = circuit.get_E_from_w(w, Z, LJ)
-alpha = 0.1
+alpha = 0.29
 n = 3
 N = 1
 #EJ, LJ, I0 = circuit.convert_EJ_LJ_I0(I0=I0)
 
 c = cspa.CircuitSnailPA(EC, EL, EJ, alpha, n, N=N, printParams=True)
 
-min_phi = -10*pi
-max_phi = 10*pi
+min_phi = -2*pi
+max_phi = 2*pi
 Npts = 101
 phiVec = np.linspace(min_phi, max_phi, Npts)
 ng_sweep = np.linspace(-1, 1, 21)
