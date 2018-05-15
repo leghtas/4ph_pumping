@@ -49,7 +49,8 @@ def restrict_p(A, loc):
 
 class CircuitSnailPA(Circuit):
 
-    def __init__(self, EC, EL, EJ, alpha, n,
+    def __init__(self, EC, EL, EJ, alpha, n, N=1,
+                 ECj = None,
                  printParams=True):
 
         # from http://arxiv.org/abs/1602.01793
@@ -62,6 +63,7 @@ class CircuitSnailPA(Circuit):
         self.EC = e**2/2/C
         self.EJ = EJ
         self.n = n
+        self.N = N
         self.alpha = alpha
 
         self.kept_dim = []
@@ -74,7 +76,10 @@ class CircuitSnailPA(Circuit):
 #        hbarXiab = (self.EJ/100.)*phia**2*phib**2
 
         omega_plasma = 2*pi*24e9
-        CJ = 1/(omega_plasma**2*(2*LJ))  # each junction has 2*LJ
+        CJ = 1/(omega_plasma**2*(2*LJ)) # each junction has 2*LJ
+        if ECj == None:
+            ECj = e**2/2/CJ
+        self.ECj = ECj
 #        beta = 2*CJ/np.sqrt((Ca+CJ)*(Cb+CJ))  # 2.104 in Steve's notes
 #        g = beta*np.sqrt(wa*wb)  # energy/hbar 2.110 in Steve's notes
 #        kappaa_over_kappab = g**2/(wa-wb)**2  # 6.40
@@ -102,20 +107,22 @@ class CircuitSnailPA(Circuit):
 
     def get_U(self, phi_ext_0=0):
         def U(p, P=np.identity(2)):
+            N = self.N
             p = P.dot(p)
             (ps, pr) = (p[0], p[1]) #phi_snail and phi_resonator
             _U = (self.EL/hbar)*pr**2 + \
-                 -self.alpha*(self.EJ/hbar)*np.cos(ps) +\
-                 -self.n*(self.EJ/hbar)*np.cos((phi_ext_0-ps)/self.n)
+                 -N*self.alpha*(self.EJ/hbar)*np.cos(ps/N) +\
+                 -N*self.n*(self.EJ/hbar)*np.cos((N*phi_ext_0-ps)/self.n/N)
             return _U
         return U
 
     def get_dUs(self, phi_ext_0=0):
         def dUs(p, P=np.identity(2)):
+            N = self.N
             p = P.dot(p)
             (ps, pr) = (p[0], p[1])
-            _dUs = self.alpha*(self.EJ/hbar)*np.sin(ps) +\
-                 -(self.EJ/hbar)*np.sin((phi_ext_0-ps)/self.n)
+            _dUs = self.alpha*(self.EJ/hbar)*np.sin(ps/N) +\
+                  -(self.EJ/hbar)*np.sin((N*phi_ext_0-ps)/self.n/N)
             return _dUs
         return dUs
 
@@ -129,10 +136,12 @@ class CircuitSnailPA(Circuit):
 
     def get_d2Uss(self, phi_ext_0=0):
         def d2Uss(p, P=np.identity(2)):
+            n = self.n
+            N = self.N
             p = P.dot(p)
             (ps, pr) = (p[0], p[1])
-            _d2Uss = self.alpha*(self.EJ/hbar)*np.cos(ps) +\
-                 1/self.n*(self.EJ/hbar)*np.cos((phi_ext_0-ps)/self.n)
+            _d2Uss = (1/N)*self.alpha*(self.EJ/hbar)*np.cos(ps/N) + \
+                     (1/n/N)*(self.EJ/hbar)*np.cos((N*phi_ext_0-ps)/n/N)
             return _d2Uss
         return d2Uss
 
@@ -161,10 +170,12 @@ class CircuitSnailPA(Circuit):
 
     def get_d3U(self, phi_ext_0=0):
         def d3U(p, P=np.identity(2)):
+            n = self.n
+            N = self.N
             p = P.dot(p)
             (ps, pr) = (p[0], p[1])
-            _d3U = -self.alpha*(self.EJ/hbar)*np.sin(ps) +\
-                   1/self.n**2*(self.EJ/hbar)*np.sin((phi_ext_0-ps)/self.n)
+            _d3U = -(1/N)**2*self.alpha*(self.EJ/hbar)*np.sin(ps/N) +\
+                    (1/n/N)**2*(self.EJ/hbar)*np.sin((N*phi_ext_0-ps)/n/N)
             return _d3U
         return d3U
 
@@ -185,10 +196,12 @@ class CircuitSnailPA(Circuit):
 
     def get_d4U(self, phi_ext_0=0):
         def d4U(p, P=np.identity(2)):
+            n = self.n
+            N = self.N
             p = P.dot(p)
             (ps, pr) = (p[0], p[1])
-            _d4U = -self.alpha*(self.EJ/hbar)*np.cos(ps) +\
-                 -1/self.n**3*(self.EJ/hbar)*np.cos((phi_ext_0-ps)/self.n)
+            _d4U = -(1/N)**3*self.alpha*(self.EJ/hbar)*np.cos(ps/N) +\
+                   -(1/n/N)**3*(self.EJ/hbar)*np.cos((N*phi_ext_0-ps)/n/N)
             return _d4U
         return d4U
 
@@ -215,34 +228,42 @@ class CircuitSnailPA(Circuit):
     def get_T(self, phi_ext_0=0):
         def T(dp, P=np.identity(2)): # dp: dphi/dt
             dp = P.dot(dp)
+            n = self.n
+            N = self.N
+            alpha = self.alpha
             (dps, dpr) = (dp[0],dp[1])
-            _T = (1/32.)*(hbar/self.EC)*(2*dpr-dps)**2
+            _T = (1/32.)*(hbar/self.EC)*(2*dpr-dps)**2 + \
+                 (1/16.)*(1/N)*(alpha+1/n)*(hbar/self.ECj)*(dps)**2
             return _T
         return T
 
     def get_d2Trr(self, phi_ext_0=0):
         def d2Trr(dp, P=np.identity(2)): # dp: dphi/dt
             dp = P.dot(dp)
-            (dps, dpr) = (dp[0],dp[1])
+            (dps, dpr) = (dp[0], dp[1])
             _d2Trr = (1/4.)*(hbar/self.EC)
             return _d2Trr
         return d2Trr
 
     def get_d2Tsr(self, phi_ext_0=0):
-        def d2Trr(dp, P=np.identity(2)): # dp: dphi/dt
+        def d2Tsr(dp, P=np.identity(2)): # dp: dphi/dt
             dp = P.dot(dp)
-            (dps, dpr) = (dp[0],dp[1])
-            _d2Trr = -(1/8.)*(hbar/self.EC)
-            return _d2Trr
-        return d2Trr
+            (dps, dpr) = (dp[0], dp[1])
+            _d2Tsr = -(1/8.)*(hbar/self.EC)
+            return _d2Tsr
+        return d2Tsr
 
     def get_d2Tss(self, phi_ext_0=0):
-        def d2Trr(dp, P=np.identity(2)): # dp: dphi/dt
+        def d2Tss(dp, P=np.identity(2)): # dp: dphi/dt
             dp = P.dot(dp)
+            n = self.n
+            N = self.N
+            alpha = self.alpha
             (dps, dpr) = (dp[0],dp[1])
-            _d2Trr = (1/16.)*(hbar/self.EC)
-            return _d2Trr
-        return d2Trr
+            _d2Tss = (1/16.)*(hbar/self.EC)  + \
+                     (1/8.)*(1/N)*(alpha+1/n)*(hbar/self.ECj)
+            return _d2Tss
+        return d2Tss
 
     def get_HessT(self, phi_ext_0=0):
         def HessT(dp, P=np.identity(2)):
@@ -279,13 +300,14 @@ class CircuitSnailPA(Circuit):
         else:
             raise Exception
 
-    def get_U_matrix(self, phi_ext_0=0, mode = 'analytical'):
+    def get_U_matrix(self, phi_ext_0=0, mode='analytical'):
         U = self.get_U(phi_ext_0=phi_ext_0)
         if mode == 'analytical':
             x0 = np.array([0, 0])
             def U1(x):
                 return U(x)/1e14
-            res = minimize(U1, x0, method='SLSQP', tol=1e-12, bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
+            res = minimize(U1, x0, method='SLSQP', tol=1e-12,
+                           bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
             if not res.success:
                 warnings.warn('Did not minimized', UserWarning)
             HessU = self.get_HessU(phi_ext_0=phi_ext_0)
@@ -365,7 +387,7 @@ class CircuitSnailPA(Circuit):
     def get_normal_mode_frame(self, phi_ext_0=0):
 
         res1, U0 = self.get_U_matrix(phi_ext_0=phi_ext_0, mode = 'analytical')
-#        print(U0)
+        print(U0)
 #        print(res1)
 #
 #        phi_s = np.array(res1[0]+np.linspace(-10*np.pi, 10*np.pi, 101))
@@ -388,7 +410,6 @@ class CircuitSnailPA(Circuit):
         res2, T0 = self.get_T_matrix(phi_ext_0=phi_ext_0, mode = 'analytical')
         wU0, vU0 = nl.eigh(U0)
         wT0, vT0 = nl.eigh(T0)
-
         sqrtwU = np.diag(wU0**0.5)
         inv_sqrtwU = np.diag(wU0**-0.5)
 #        print(inv_sqrtwU)
@@ -443,6 +464,7 @@ class CircuitSnailPA(Circuit):
 
 
         return res1, res2, P, wU3
+
 
 def true0(A):
     A_max = np.max(np.abs(A))

@@ -19,20 +19,22 @@ pi = np.pi
 plt.close('all')
 w = 8*1e9*2*np.pi
 Z = 50
-LJ = 1.32e-08
-I0 = 7.1*1e-6 #A EJ=phi0*I0
+#LJ = 1.32e-08
+#I0 = 7.1*1e-6 #A EJ=phi0*I0
+LJ = 40e-12
 
 EC, EL, EJ = circuit.get_E_from_w(w, Z, LJ)
-alpha = 0.29
+alpha = 0.1
 n = 3
-EJ, LJ, I0 = circuit.convert_EJ_LJ_I0(I0=I0)
+N = 1
+#EJ, LJ, I0 = circuit.convert_EJ_LJ_I0(I0=I0)
 
+c = cspa.CircuitSnailPA(EC, EL, EJ, alpha, n, N=N, printParams=True)
 
-c = cspa.CircuitSnailPA(EC, EL, EJ, alpha, n, printParams=True)
-
-min_phi = -2*pi
-max_phi = 2*pi
-phiVec = np.linspace(min_phi, max_phi, 1001)
+min_phi = -10*pi
+max_phi = 10*pi
+Npts = 101
+phiVec = np.linspace(min_phi, max_phi, Npts)
 ng_sweep = np.linspace(-1, 1, 21)
 
 Xi2 = np.zeros((2, len(phiVec)))
@@ -43,10 +45,19 @@ resx = np.zeros(len(phiVec))
 resy = np.zeros(len(phiVec))
 
 
+if 1==1:
+    U = c.get_U(phi_ext_0=0)
+    Uarray = np.zeros((Npts, Npts))
+    for i1, p1 in enumerate(phiVec):
+        for i2, p2 in enumerate(phiVec):
+            Uarray[i1, i2] = U([p1, p2])/2/np.pi/1e9
+    fig, ax = plt.subplots()
+    ax.pcolor(phiVec, phiVec, Uarray)
 # Get freqs and Kerrs v.s. flux
 if 1==1:
     for kk, xx in enumerate(phiVec):
-        res1, res2, Xi2s, Xi3s, Xi4s, check_Xi2s = c.get_freqs_kerrs(phi_ext_0=xx)
+        _res = c.get_freqs_kerrs(phi_ext_0=xx)
+        res1, res2, Xi2s, Xi3s, Xi4s, check_Xi2s = _res
         Xi2[:, kk] = Xi2s
         Xi3[:, kk] = Xi3s
         Xi4[:, kk] = Xi4s
@@ -54,9 +65,8 @@ if 1==1:
         resx[kk] = res1[0]
         resy[kk] = res1[1]
 
-
 # PLOT
-if 1==1:
+if 1==0:
     fig, ax = plt.subplots(2, 4, figsize=(16,8))
 #    ax[0].plot(phi_ext_sweep/np.pi, resx/np.pi)
 #    ax[0].plot(phi_ext_sweep/np.pi, resy/np.pi)
