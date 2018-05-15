@@ -17,16 +17,16 @@ from scipy.misc import factorial
 pi = np.pi
 
 plt.close('all')
-w = 8*1e9*2*np.pi
+w = 13*1e9*2*np.pi
 Z = 50
 #LJ = 1.32e-08
-I0 = 7.1*1e-6 #A EJ=phi0*I0
-#LJ = 40e-12
+#I0 = 7.1*1e-6 #A EJ=phi0*I0
+LJ = 47e-12
 
 EC, EL, EJ = circuit.get_E_from_w(w, Z, LJ)
-alpha = 0.29
+alpha = 0.1
 n = 3
-N = 1
+N = 20
 #EJ, LJ, I0 = circuit.convert_EJ_LJ_I0(I0=I0)
 
 c = cspa.CircuitSnailPA(EC, EL, EJ, alpha, n, N=N, printParams=True)
@@ -66,15 +66,15 @@ if 1==1:
         resy[kk] = res1[1]
 
 # PLOT
-if 1==0:
+if 1==1:
     fig, ax = plt.subplots(2, 4, figsize=(16,8))
 #    ax[0].plot(phi_ext_sweep/np.pi, resx/np.pi)
 #    ax[0].plot(phi_ext_sweep/np.pi, resy/np.pi)
 #    ax[0].plot(phi_ext_sweep/np.pi, resz/np.pi)
     ax[0,0].plot(phiVec/2/pi, Xi2[0,:]/1e9)
     ax[1,0].plot(phiVec/2/pi, Xi2[1,:]/1e9)
-    ax[0,0].plot(phiVec/2/pi, check_Xi2[0,:]/1e9)
-    ax[1,0].plot(phiVec/2/pi, check_Xi2[1,:]/1e9)
+    ax[0,0].plot(phiVec/2/pi, check_Xi2[1,:]/1e9)
+    ax[1,0].plot(phiVec/2/pi, check_Xi2[0,:]/1e9)
 
     ax[0,1].plot(phiVec/2/pi, np.abs(Xi3[0,:]/1e6))
     ax[1,1].plot(phiVec/2/pi, np.abs(Xi3[1,:]/1e6))
@@ -91,7 +91,7 @@ if 1==0:
     ax[1,3].semilogy(Xi2[1,:]/1e9, np.abs(Xi3[1,:]/Xi4[1,:]))
     ax[1,3].semilogy([fmin, fmax], [10,10])
     ax[1,3].semilogy([fmin, fmax], [100,100])
-    ax[1,3].set_ylim([5,np.max(np.abs(Xi3[1,:]/Xi4[1,:]))])
+    #ax[1,3].set_ylim([5,np.max(np.abs(Xi3[1,:]/Xi4[1,:]))])
 
 
     ax[0,0].set_title('frequency (GHz)')
@@ -184,65 +184,3 @@ if 1==0:
     ax3[0,2].axis('equal')
     ax3[1,2].axis('equal')
     #ax2[1].plot(phi_ext_sweep/np.pi, gradUval_)
-
-if 1==0:
-    fig, ax = plt.subplots(3, figsize=(12,8), sharex=True)
-    a=0.755e-3/3
-    ax[0].plot(a*phi_ext_sweep/np.pi, f[0,:]/1e9)
-    ax[1].plot(a*phi_ext_sweep/np.pi, f[1,:]/1e9)
-    ax[2].plot(a*phi_ext_sweep/np.pi, f[2,:]/1e9)
-
-    ### data ###
-    folder = r'../no_squid/analyzed_data/'
-
-    filename_readout = r'sweep_DC_specVNA_DC2_in2outC_004.dat_'
-    readout_freq = np.load(folder+filename_readout+'freq.npy')
-    readout_flux = np.load(folder+filename_readout+'flux.npy')
-
-    filename_buffer = r'sweep_DC_specVNA_DC2_in4outD_003.dat_'
-    buffer_freq = np.load(folder+filename_buffer+'freq_fit.npy')
-    buffer_flux = np.load(folder+filename_buffer+'flux.npy')
-
-    filename_mem = r'VNA_sweep_DC_sweep_pump_freq_DC2_in2_outC_pump6_002.dat_'
-    mem_freq = np.load(folder+filename_mem+'freq_fit.npy')
-    mem_flux = np.load(folder+filename_mem+'flux.npy')
-
-    offs = 1.2e-4
-    ax[0].plot(mem_flux+1e-4-offs, mem_freq, 'o')
-    ax[1].plot(buffer_flux+1e-4- offs, buffer_freq, 'o')
-    ax[2].plot(readout_flux-offs, readout_freq/1e9, 'o')
-    ax[2].set_xlabel('DC (V)')
-    ax[0].set_ylabel('mem freq')
-    ax[1].set_ylabel('buff freq')
-    ax[2].set_ylabel('readout freq')
-
-
-#fa = []
-#fb = []
-#
-#for phi_ext_s in phi_ext_sweep:
-#    H = c.getH_overhbar_two_mode(phi_ext_l=phi_ext_s)
-#    E = H.eigenenergies()
-#    fa.append(E[1]-E[0])
-#    fb.append(E[2]-E[0])
-#
-#fig, ax = plt.subplots()
-#ax.plot(phi_ext_sweep/np.pi, [f/2/np.pi/1e9 for f in fa])
-#ax.plot(phi_ext_sweep/np.pi, [f/2/np.pi/1e9 for f in fb])
-
-#c.pltElevels('phi_ext_s', phi_ext_sweep,
-#             phiVec=np.linspace(-pi, pi, 101),
-#             phi_ext_s_0=0, phi_ext_l_0=0, n_g_0=0)
-
-#
-# c.pltElevels('n_g', ng_sweep,
-#             phiVec=np.linspace(-pi, pi, 101),
-#             phi_ext_s_0=pi, phi_ext_l_0=0, n_g_0=0)
-
-#fig, ax = plt.subplots()
-#for ii in range(len(phi_ext_sweep)):
-#    ax.plot((np.diff(Elevels[ii,:])[0:298]/1e9/2/np.pi))
-#ax.plot((np.diff(Elevels[0,:])[0:70]/1e9/2/np.pi))
-
-#for ii in range(29):
-#    ax.plot(np.diff(Elevels)[:,ii]/1e9/2/np.pi)

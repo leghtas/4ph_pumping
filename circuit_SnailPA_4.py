@@ -422,7 +422,7 @@ class CircuitSnailPA(Circuit):
 #        print(T1)
         wT1, vT1 = nl.eigh(T1)
 #        print(wT1, vT1)
-        order1 = 10**-(int(np.log10(np.max(inv_sqrtwU)))-1)
+        order1 = 1#10**-(int(np.log10(np.max(inv_sqrtwU)))-1)
 #        print(order1)
         inv_sqrtwU *= order1
 #        print(inv_sqrtwU)
