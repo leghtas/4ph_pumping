@@ -14,18 +14,39 @@ import scipy.linalg as sl
 import numpy.linalg as nl
 import numdifftools as nd
 from scipy.misc import factorial
+import matplotlib
+from matplotlib.animation import FuncAnimation
+import sys
+
+def move_figure(f, x, y):
+    """Move figure's upper left corner to pixel (x, y)"""
+    backend = matplotlib.get_backend()
+    if backend == 'TkAgg':
+        f.canvas.manager.window.wm_geometry("+%d+%d" % (x, y))
+    elif backend == 'WXAgg':
+        f.canvas.manager.window.SetPosition((x, y))
+    else:
+        # This works for QT and GTK
+        # You can also use window.setGeometry
+        f.canvas.manager.window.move(x, y)
+    plt.show()
+
+fs = 30
 pi = np.pi
 
 plt.close('all')
-w = 8*1e9*2*np.pi
+w = 6.935*1e9*2*np.pi #8.23*1e9*2*np.pi
 Z = 50
 LJ = 1.32e-08
 I0 = 7.1*1e-6 #A EJ=phi0*I0
+
 
 EC, EL, EJ = circuit.get_E_from_w(w, Z, LJ)
 alpha = 0.29
 n = 3
 EJ, LJ, I0 = circuit.convert_EJ_LJ_I0(I0=I0)
+#LJ = 0.1e-9
+#EJ, LJ, I0 = circuit.convert_EJ_LJ_I0(LJ=LJ)
 
 
 c = cspa.CircuitSnailPA(EC, EL, EJ, alpha, n, printParams=True)
@@ -42,6 +63,33 @@ check_Xi2 = np.zeros((2, len(phiVec)))
 resx = np.zeros(len(phiVec))
 resy = np.zeros(len(phiVec))
 
+#Plot potential
+if 1==0:
+    fig, ax = plt.subplots(figsize = (12,12))
+    ax.set_xlabel(r'$\varphi_r$', fontsize = fs)
+    ax.set_ylabel(r'$\varphi_s$', fontsize = fs)
+    min_i = 0
+    max_i = 10
+    def update(i):
+        Phi_ext = np.linspace(0,2*np.pi, max_i-min_i)
+        phi_ext= Phi_ext[i]
+        U = c.get_U(phi_ext_0=phi_ext)
+        shape=(40,20)
+        Ps = np.linspace(-8*np.pi, 8*np.pi, shape[0])
+        Pr = np.linspace(-8*np.pi, 8*np.pi, shape[1])
+
+        U_color = np.empty(shape)
+        for ii, ps in enumerate(Ps):
+            for jj, pr in enumerate(Pr):
+                U_color[ii, jj] = U(np.array([ps, pr]))
+
+        ax.pcolor(Pr, Ps, U_color, vmin=vmin, vmax=vmax)
+        return ax
+#        move_figure(fig, -1900, 10)
+
+    anim = FuncAnimation(fig, update, frames=np.arange(min_i, max_i), interval=200)
+#    if len(sys.argv) > 1 and sys.argv[1] == 'save':
+    anim.save('line.html', dpi=80, writer='imagemagick')
 
 # Get freqs and Kerrs v.s. flux
 if 1==1:
@@ -78,18 +126,21 @@ if 1==1:
 
     fmin = min(Xi2[1,:]/1e9)
     fmax = max(Xi2[1,:]/1e9)
-    ax[1,3].semilogy(Xi2[1,:]/1e9, np.abs(Xi3[1,:]/Xi4[1,:]))
+    ax[1,3].semilogy(Xi2[1,:]/1e9, np.abs(Xi3[1,:]/Xi4[1,:])/2)
     ax[1,3].semilogy([fmin, fmax], [10,10])
     ax[1,3].semilogy([fmin, fmax], [100,100])
-    ax[1,3].set_ylim([5,np.max(np.abs(Xi3[1,:]/Xi4[1,:]))])
+    ax[1,3].set_ylim([5,np.max(np.abs(Xi3[1,:]/Xi4[1,:])/2)])
 
 
-    ax[0,0].set_title('frequency (GHz)')
-    ax[0,1].set_title('$a^2a^{\dag}$ (MHz)')
-    ax[0,2].set_title('$a^2a^{\dag 2}$ (MHz)')
-    ax[0,3].set_title('$a^2a^{\dag}/a^2a^{\dag 2}$')
+    ax[1,0].set_title('frequency (GHz)')
+    ax[1,1].set_title('$a^2a^{\dag}$ (MHz)')
+    ax[1,2].set_title('$a^2a^{\dag 2}$ (MHz)')
+    ax[1,3].set_title('$a^2a^{\dag}/a^2a^{\dag 2}$')
     ax[0,0].set_ylabel('MEMORY')
-    ax[1,0].set_ylabel('BUFFER')
+    ax[1,0].set_ylabel('frequency (GHz)')
+    ax[1,0].set_xlabel('$\Phi_{\mathrm{ext}}/\Phi_0$')
+    ax[1,3].set_xlabel('frequency (GHz)')
+    ax[1,3].set_ylabel('$c_3/K$')
 
 #    fig2, ax2 = plt.subplots(2)
 #    ax2[0].scatter(k[1,:]/1e9, k[0,:]/1e9, 10, label='0 photon')

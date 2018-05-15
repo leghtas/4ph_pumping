@@ -110,6 +110,15 @@ class CircuitSnailPA(Circuit):
             return _U
         return U
 
+    def get_U_1d(self, phi_ext_0=0):
+        def U(p, P=np.identity(2)):
+            p = P.dot(p)
+            (ps, pr) = (p[0], p[1]) #phi_snail and phi_resonator
+            _U = -self.alpha*(self.EJ/hbar)*np.cos(ps) +\
+                 -self.n*(self.EJ/hbar)*np.cos((phi_ext_0-ps)/self.n)
+            return _U
+        return U
+
     def get_dUs(self, phi_ext_0=0):
         def dUs(p, P=np.identity(2)):
             p = P.dot(p)
@@ -229,20 +238,20 @@ class CircuitSnailPA(Circuit):
         return d2Trr
 
     def get_d2Tsr(self, phi_ext_0=0):
-        def d2Trr(dp, P=np.identity(2)): # dp: dphi/dt
+        def d2Tsr(dp, P=np.identity(2)): # dp: dphi/dt
             dp = P.dot(dp)
             (dps, dpr) = (dp[0],dp[1])
-            _d2Trr = -(1/8.)*(hbar/self.EC)
-            return _d2Trr
-        return d2Trr
+            _d2Tsr = -(1/8.)*(hbar/self.EC)
+            return _d2Tsr
+        return d2Tsr
 
     def get_d2Tss(self, phi_ext_0=0):
-        def d2Trr(dp, P=np.identity(2)): # dp: dphi/dt
+        def d2Tss(dp, P=np.identity(2)): # dp: dphi/dt
             dp = P.dot(dp)
             (dps, dpr) = (dp[0],dp[1])
-            _d2Trr = (1/16.)*(hbar/self.EC)
-            return _d2Trr
-        return d2Trr
+            _d2Tss = (1/16.)*(hbar/self.EC)
+            return _d2Tss
+        return d2Tss
 
     def get_HessT(self, phi_ext_0=0):
         def HessT(dp, P=np.identity(2)):
@@ -396,29 +405,29 @@ class CircuitSnailPA(Circuit):
 #        print(T0)
         wT0, vT0 = nl.eigh(T0)
 #        print(wT0, vT0)
-        T1 = np.dot(np.dot(vU0.T, T0), vU0)
+        T1 = np.dot(np.dot(vU0.T, T0), vU0)                    #Rotate T0 in basis were U0 is diagonal
 #        print('T1')
 #        print(T1)
-        wT1, vT1 = nl.eigh(T1)
+        wT1, vT1 = nl.eigh(T1)                                 #Find eigenstates and vectors in this basis (should be the same as wT0, vT0)
 #        print(wT1, vT1)
-        order1 = 10**-(int(np.log10(np.max(inv_sqrtwU)))-1)
+        order1 = 10**-(int(np.log10(np.max(inv_sqrtwU)))-1)    #Find the order of magnitude of the largest eigenvalue of U0
 #        print(order1)
-        inv_sqrtwU *= order1
+        inv_sqrtwU *= order1                                   #Make the largest eigenvalue of U0 of order 1
 #        print(inv_sqrtwU)
-        T2 = np.dot(np.dot(inv_sqrtwU, T1), inv_sqrtwU)
+        T2 = np.dot(np.dot(inv_sqrtwU, T1), inv_sqrtwU)        #Perform the homotethie on T2 with order 1 changes
         inv_sqrtwU /= order1
 #        print('T2')
 #        print(T2)
-        wT2, vT2 = nl.eigh(T2)
+        wT2, vT2 = nl.eigh(T2)                                 #Find eigenstates and vectors in this new basis
         wT2 /= order1**2
 #        print('freq')
 #        print(wT2, vT2)
-        wU2 = 1/wT2
-        sqrtwT = np.diag(wT2**0.5)
+        wU2 = 1/wT2                                            #Diagonal wT2 should be 1/w**2
+        sqrtwT = np.diag(wT2**0.5)                             #
         max_wT2 = np.max(np.abs(wT2))
-        inv_sqrtwT = np.diag([w**-0.5 if (w/max_wT2)>1e-10 else 1 for w in wT2])
+        inv_sqrtwT = np.diag([w**-0.5 if (w/max_wT2)>1e-10 else 1 for w in wT2]) #should give a matrix with eigenfrequencies as diagonal
 
-        P = np.dot(np.dot(np.dot(vU0, inv_sqrtwU), vT2), inv_sqrtwT)
+        P = np.dot(np.dot(np.dot(vU0, inv_sqrtwU), vT2), inv_sqrtwT)   #compute the matrix transformation we did on T overall P T P-1 should be identity
 #        P_test = np.dot(np.dot(vU0, inv_sqrtwU), vT2)
 #        print('Ps')
 #        print(P)
@@ -427,14 +436,14 @@ class CircuitSnailPA(Circuit):
 #        print('P')
 #        print(true0(P))
         invP = np.dot(inv_sqrtwT, np.dot(np.dot(vT2.T, inv_sqrtwU), vU0.T))
-        T3 = true0(np.dot(np.dot(invP, T0), P))
+        T3 = true0(np.dot(np.dot(invP, T0), P))                        # actually is not identity because of the too many variable
 #        print('T3')
 #        print(T3)
 
         U3 = np.dot(np.dot(invP, U0), P)
 #        print('U3')
 #        print(U3)
-        wU3, vU3 = nl.eigh(U3)
+        wU3, vU3 = nl.eigh(U3)                                          #give the right diag(w**2) expected
 #        print('freq')
 #        print(wU3)
 #        print(afljdskg)

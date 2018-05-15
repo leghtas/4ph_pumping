@@ -28,12 +28,12 @@ solve2mode = True
 solve3mode = False
 
 alpha0 = 0*np.sqrt(0.001)*np.sqrt(2)*np.exp(1j*np.pi/2)
-alpha1 = np.sqrt(0.001*10)*np.sqrt(2)*np.exp(1j*np.pi/2)
-g2 = 2 * np.pi * 1 * 10
+alpha1 = np.sqrt(0.1)*np.sqrt(2)*np.exp(1j*np.pi/2)
+g2 = 2 * np.pi * 1 * 2
 Kerr = 0
 
-kappaa = 1. / 2.*10
-kappab = 2 * np.pi * 3.
+kappaa = 1. / 2.
+kappab = 2 * np.pi * 1
 kappaphi = 0 * 2 * np.pi * 0.1
 
 
@@ -58,8 +58,8 @@ c_ops2 = [np.sqrt(kappaa)*qt.tensor(a, qt.identity(Nb)),
           np.sqrt(kappab)*qt.tensor(qt.identity(Na), b),
           np.sqrt(kappaphi)*qt.tensor(a.dag()*a, qt.identity(Nb))]
 
-dmax = 300/40/5*10
-pmax = 1500
+dmax = 10 * kappab
+pmax = 10 * kappab
 #pmax = 300/40
 numd = 31
 nump = 31
@@ -72,12 +72,13 @@ for jj, delta_d in enumerate(delta_d_Vec):
     print('%s / %s' % (jj, len(delta_d_Vec)))
     for kk, delta_p in enumerate(delta_p_Vec):
         Hdet = (delta_p+delta_d)/2 * qt.tensor(a.dag()*a, qt.identity(Nb)) + \
-            delta_d * qt.tensor(qt.identity(Na), b.dag()*b)
+            delta_d * qt.tensor(qt.identity(Na), b.dag()*b) + \
+            g2*alpha1**2 * qt.tensor(qt.identity(Na), b.dag() + b)
         Hdet2 = delta_d * qt.tensor(a.dag()*a, qt.identity(Nb)) + \
             (2*delta_d-delta_p) * qt.tensor(qt.identity(Na), b.dag()*b) +\
             g2*alpha1**2 * qt.tensor((a.dag() + a), qt.identity(Nb))
         try:
-            rho_ss = qt.steadystate(Hdet2 + H2, c_ops2)
+            rho_ss = qt.steadystate(Hdet + H2, c_ops2)
         except Exception:
             print(f'failed jj={jj},kk={kk}')
         at[kk, jj] = qt.expect(aI, rho_ss)
@@ -85,15 +86,15 @@ for jj, delta_d in enumerate(delta_d_Vec):
 
 fig, ax = plt.subplots(2)
 _delta_d_Vec, _delta_p_Vec = to_pcolor(delta_d_Vec, delta_p_Vec)
-plt_abs = np.abs(at)
-plt_angle = np.angle(at)
+plt_abs = np.abs(bt)
+plt_angle = np.angle(bt)
 abs_mean = np.mean(plt_abs)
 abs_std = np.std(plt_abs)
 ax[0].pcolor(_delta_d_Vec/2/np.pi, _delta_p_Vec/2/np.pi, plt_abs)
 ax[1].pcolor(_delta_d_Vec/2/np.pi, _delta_p_Vec/2/np.pi, plt_angle)
-#ax[0].plot([2*g2*2**(1/2)/2/2/np.pi, 2*g2*2**(1/2)/2/2/np.pi], [_delta_p_Vec[0]/2/np.pi, _delta_p_Vec[-1]/2/np.pi])
-#ax[0].plot([-2*g2*2**(1/2)/2/2/np.pi, -2*g2*2**(1/2)/2/2/np.pi], [_delta_p_Vec[0]/2/np.pi, _delta_p_Vec[-1]/2/np.pi])
-#ax[0].plot([_delta_d_Vec[0]/2/np.pi, _delta_d_Vec[-1]/2/np.pi], [0,0])
+ax[0].plot([2*g2*2**(1/2)/2/2/np.pi, 2*g2*2**(1/2)/2/2/np.pi], [_delta_p_Vec[0]/2/np.pi, _delta_p_Vec[-1]/2/np.pi])
+ax[0].plot([-2*g2*2**(1/2)/2/2/np.pi, -2*g2*2**(1/2)/2/2/np.pi], [_delta_p_Vec[0]/2/np.pi, _delta_p_Vec[-1]/2/np.pi])
+ax[0].plot([_delta_d_Vec[0]/2/np.pi, _delta_d_Vec[-1]/2/np.pi], [0,0])
 ax[0].axis('tight')
 ax[1].axis('tight')
 plt.show()
