@@ -53,7 +53,7 @@ c = cspa.CircuitSnailPA(EC, EL, EJ, alpha, n, printParams=True)
 
 min_phi = -2*pi
 max_phi = 2*pi
-phiVec = np.linspace(min_phi, max_phi, 1001)
+phiVec = np.linspace(min_phi, max_phi, 101)
 ng_sweep = np.linspace(-1, 1, 21)
 
 Xi2 = np.zeros((2, len(phiVec)))

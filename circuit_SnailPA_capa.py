@@ -161,17 +161,14 @@ class CircuitSnailPA(Circuit):
         if parameters is None:
             parameters=self.varying_params
         def HessnU(p, P=np.identity(self.dim)):
-            print(p)
-            print(P)
-            p = P.dot(p)
-            
+#            p = P.dot(p)   
             _HessnU= []
             for which in which_list(n, self.dim):
                 _HessnU.append(self.get_anyU(which, parameters=parameters)(p))
             shape=[self.dim for ii in range(n)]
             _HessnU=np.array(_HessnU).reshape(shape)
             
-            permutations = tuple_list(self.dim)
+            permutations = tuple_list(n)
             for permutation in permutations:
                 _HessnU = np.transpose(np.dot(np.transpose(_HessnU, permutation), P), permutation)
 #            _HessU1 = np.transpose(np.dot(np.transpose(_HessU,(0,1)), P),(0,1))
