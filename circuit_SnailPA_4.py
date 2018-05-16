@@ -306,8 +306,8 @@ class CircuitSnailPA(Circuit):
             x0 = np.array([0, 0])
             def U1(x):
                 return U(x)/1e14
-            res = minimize(U1, x0, method='SLSQP', tol=1e-12,
-                           bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
+            res = minimize(U1, x0, method='SLSQP', tol=1e-12)
+                           #bounds=[(-20*np.pi, 20*np.pi), (-20*np.pi, 20*np.pi)]) ################################################################# becareful bounds
             if not res.success:
                 warnings.warn('Did not minimized', UserWarning)
             HessU = self.get_HessU(phi_ext_0=phi_ext_0)
@@ -387,84 +387,23 @@ class CircuitSnailPA(Circuit):
     def get_normal_mode_frame(self, phi_ext_0=0):
 
         res1, U0 = self.get_U_matrix(phi_ext_0=phi_ext_0, mode = 'analytical')
-        print(U0)
-#        print(res1)
-#
-#        phi_s = np.array(res1[0]+np.linspace(-10*np.pi, 10*np.pi, 101))
-#        phi_r = np.array([np.zeros(101)])
-#        phi = np.concatenate((np.array([phi_s]), phi_r), axis=0).T
-#        fign, axn = plt.subplots(3)
-#        fct_U = self.get_U(phi_ext_0)
-#        U = np.array([fct_U(phi[ii]) for ii in range(101)])
-#        fct_dUs = self.get_dUs(phi_ext_0)
-#        dUs = np.array([fct_dUs(phi[ii]) for ii in range(101)])
-#        fct_d2Uss = self.get_d2Uss(phi_ext_0)
-#        d2Uss = np.array([fct_d2Uss(phi[ii]) for ii in range(101)])
-#        axn[0].plot(phi_s, U)
-#        axn[0].plot([res1[0], res1[0]],[min(U), max(U)])
-#        axn[1].plot(phi_s, dUs)
-#        axn[1].plot([res1[0], res1[0]],[min(dUs), max(dUs)])
-#        axn[2].plot(phi_s, d2Uss)
-#        axn[2].plot([res1[0], res1[0]],[min(d2Uss), max(d2Uss)])
-
         res2, T0 = self.get_T_matrix(phi_ext_0=phi_ext_0, mode = 'analytical')
-        wU0, vU0 = nl.eigh(U0)
-        wT0, vT0 = nl.eigh(T0)
-        sqrtwU = np.diag(wU0**0.5)
-        inv_sqrtwU = np.diag(wU0**-0.5)
-#        print(inv_sqrtwU)
-#        print('T0')
-#        print(T0)
-        wT0, vT0 = nl.eigh(T0)
-#        print(wT0, vT0)
-        T1 = np.dot(np.dot(vU0.T, T0), vU0)
-#        print('T1')
-#        print(T1)
-        wT1, vT1 = nl.eigh(T1)
-#        print(wT1, vT1)
-        order1 = 1#10**-(int(np.log10(np.max(inv_sqrtwU)))-1)
-#        print(order1)
-        inv_sqrtwU *= order1
-#        print(inv_sqrtwU)
-        T2 = np.dot(np.dot(inv_sqrtwU, T1), inv_sqrtwU)
-        inv_sqrtwU /= order1
-#        print('T2')
-#        print(T2)
-        wT2, vT2 = nl.eigh(T2)
-        wT2 /= order1**2
-#        print('freq')
-#        print(wT2, vT2)
-        wU2 = 1/wT2
-        sqrtwT = np.diag(wT2**0.5)
-        max_wT2 = np.max(np.abs(wT2))
-        inv_sqrtwT = np.diag([w**-0.5 if (w/max_wT2)>1e-10 else 1 for w in wT2])
+        
+        w0, v0 = nl.eigh(T0)
+        sqrtw = sl.sqrtm(np.diag(w0))
+        # print(nl.norm(np.dot(np.dot(v0, np.diag(w0)), nl.inv(v0))-T0) \
+        # /nl.norm(T0))
+        U1 = np.dot(np.dot(nl.inv(v0), U0), v0)
+        U2 = np.dot(np.dot(nl.inv(sqrtw), U1), nl.inv(sqrtw))
+        w2, v2 = nl.eigh(U2)
+        P = np.dot(np.dot(v0, nl.inv(sqrtw)), v2)
+        invP = np.dot(np.dot(nl.inv(v2), nl.inv(sqrtw)), nl.inv(v0))
 
-        P = np.dot(np.dot(np.dot(vU0, inv_sqrtwU), vT2), inv_sqrtwT)
-#        P_test = np.dot(np.dot(vU0, inv_sqrtwU), vT2)
-#        print('Ps')
-#        print(P)
-#        print(P_test)
-#        pseudo_invP = np.dot(np.dot(np.dot(sqrtwT, vT2.T), sqrtwU), vU0.T)
-#        print('P')
-#        print(true0(P))
-        invP = np.dot(inv_sqrtwT, np.dot(np.dot(vT2.T, inv_sqrtwU), vU0.T))
-        T3 = true0(np.dot(np.dot(invP, T0), P))
-#        print('T3')
-#        print(T3)
-
-        U3 = np.dot(np.dot(invP, U0), P)
-#        print('U3')
-#        print(U3)
-        wU3, vU3 = nl.eigh(U3)
-#        print('freq')
-#        print(wU3)
-#        print(afljdskg)
-
-        print('\n')
-
+        pseudo_invP = np.dot(np.dot(nl.inv(v2), np.diag(w0**0.5)), nl.inv(v0))
+        
+        wU3 = np.diag(np.dot(np.dot(invP, U0), P))
 
         return res1, res2, P, wU3
-
 
 def true0(A):
     A_max = np.max(np.abs(A))

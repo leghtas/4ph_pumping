@@ -17,23 +17,22 @@ from scipy.misc import factorial
 pi = np.pi
 
 plt.close('all')
-w = 13*1e9*2*np.pi
-Z = 50
 #LJ = 1.32e-08
 #I0 = 7.1*1e-6 #A EJ=phi0*I0
-LJ = 47e-12
+
+Z, w, LJ, N, alpha, n = [50, 8*1e9*2*np.pi, 60e-12, 1, 0.29, 3]
+#Z, w, LJ, N, alpha, n = [50, 8*1e9*2*np.pi, 47e-12, 20, 0.09, 3]
+#LJ, N, alpha, n = [40e-12, 20, 0.01, 3]
 
 EC, EL, EJ = circuit.get_E_from_w(w, Z, LJ)
-alpha = 0.1
-n = 3
-N = 20
+
 #EJ, LJ, I0 = circuit.convert_EJ_LJ_I0(I0=I0)
 
 c = cspa.CircuitSnailPA(EC, EL, EJ, alpha, n, N=N, printParams=True)
 
 min_phi = -2*pi
 max_phi = 2*pi
-Npts = 101
+Npts = 201
 phiVec = np.linspace(min_phi, max_phi, Npts)
 ng_sweep = np.linspace(-1, 1, 21)
 
@@ -46,13 +45,16 @@ resy = np.zeros(len(phiVec))
 
 
 if 1==1:
-    U = c.get_U(phi_ext_0=0)
+    U = c.get_U(phi_ext_0=np.pi)
     Uarray = np.zeros((Npts, Npts))
     for i1, p1 in enumerate(phiVec):
         for i2, p2 in enumerate(phiVec):
             Uarray[i1, i2] = U([p1, p2])/2/np.pi/1e9
     fig, ax = plt.subplots()
     ax.pcolor(phiVec, phiVec, Uarray)
+    fig, ax = plt.subplots()
+    ax.plot(phiVec, Uarray[100,:])
+    ax.plot(phiVec, Uarray[:,100])
 # Get freqs and Kerrs v.s. flux
 if 1==1:
     for kk, xx in enumerate(phiVec):
@@ -73,8 +75,8 @@ if 1==1:
 #    ax[0].plot(phi_ext_sweep/np.pi, resz/np.pi)
     ax[0,0].plot(phiVec/2/pi, Xi2[0,:]/1e9)
     ax[1,0].plot(phiVec/2/pi, Xi2[1,:]/1e9)
-    ax[0,0].plot(phiVec/2/pi, check_Xi2[1,:]/1e9)
-    ax[1,0].plot(phiVec/2/pi, check_Xi2[0,:]/1e9)
+    ax[0,0].plot(phiVec/2/pi, check_Xi2[0,:]/1e9)
+    ax[1,0].plot(phiVec/2/pi, check_Xi2[1,:]/1e9)
 
     ax[0,1].plot(phiVec/2/pi, np.abs(Xi3[0,:]/1e6))
     ax[1,1].plot(phiVec/2/pi, np.abs(Xi3[1,:]/1e6))
@@ -88,18 +90,18 @@ if 1==1:
 
     fmin = min(Xi2[1,:]/1e9)
     fmax = max(Xi2[1,:]/1e9)
+    ax[0,0].set_ylim([4, 8])
     ax[1,3].semilogy(Xi2[1,:]/1e9, np.abs(Xi3[1,:]/Xi4[1,:]))
     ax[1,3].semilogy([fmin, fmax], [10,10])
     ax[1,3].semilogy([fmin, fmax], [100,100])
     #ax[1,3].set_ylim([5,np.max(np.abs(Xi3[1,:]/Xi4[1,:]))])
 
-
     ax[0,0].set_title('frequency (GHz)')
     ax[0,1].set_title('$a^2a^{\dag}$ (MHz)')
     ax[0,2].set_title('$a^2a^{\dag 2}$ (MHz)')
     ax[0,3].set_title('$a^2a^{\dag}/a^2a^{\dag 2}$')
-    ax[0,0].set_ylabel('MEMORY')
-    ax[1,0].set_ylabel('BUFFER')
+    ax[0,0].set_ylabel('Resonator')
+    ax[1,0].set_ylabel('Plasma')
 
 #    fig2, ax2 = plt.subplots(2)
 #    ax2[0].scatter(k[1,:]/1e9, k[0,:]/1e9, 10, label='0 photon')
