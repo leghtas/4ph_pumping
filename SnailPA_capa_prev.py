@@ -9,7 +9,7 @@ import scipy.constants as sc
 import numpy as np
 import matplotlib.pyplot as plt
 import circuit
-import circuit_SnailPA_capa as cspa
+import circuit_SnailPA_capa_prev as cspa
 import scipy.linalg as sl
 import numpy.linalg as nl
 import numdifftools as nd
@@ -126,10 +126,10 @@ if 1==1:
 
     fmin = min(Xi2[1,:]/1e9)
     fmax = max(Xi2[1,:]/1e9)
-#    ax[1,3].semilogy(Xi2[1,:]/1e9, np.abs(Xi3[1,:]/Xi4[1,:])/2)
-#    ax[1,3].semilogy([fmin, fmax], [10,10])
-#    ax[1,3].semilogy([fmin, fmax], [100,100])
-#    ax[1,3].set_ylim([5,np.max(np.abs(Xi3[1,:]/Xi4[1,:])/2)])
+    ax[1,3].semilogy(Xi2[1,:]/1e9, np.abs(Xi3[1,:]/Xi4[1,:])/2)
+    ax[1,3].semilogy([fmin, fmax], [10,10])
+    ax[1,3].semilogy([fmin, fmax], [100,100])
+    ax[1,3].set_ylim([5,np.max(np.abs(Xi3[1,:]/Xi4[1,:])/2)])
 
 
     ax[1,0].set_title('frequency (GHz)')
