@@ -37,6 +37,8 @@ class CircuitSnailPA(c.Circuit):
         CJ = 1/(omega_plasma**2*(2*LJ)) # each junction has 2*LJ
         if ECj == None:
             ECj = e**2/2/CJ
+            
+        # Fixed parameters should be given as class attribute
         self.ECj = ECj
         self.EL = phi0**2/L
         self.EC = e**2/2/C
@@ -45,6 +47,7 @@ class CircuitSnailPA(c.Circuit):
         self.NN = NN
         self.alpha = alpha
         
+        # Varying parameters should be stored in this dictionary
         self.varying_params={'phi_ext_0':0}
         
         self.U_str = 'EL/hbar*pr**2 \
@@ -72,6 +75,7 @@ class CircuitSnailPA(c.Circuit):
             print('')
 #            print("kappab/kappaa limited by CJ = "+str(1/kappaa_over_kappab))
         
+        # Maximum order of the expansion. 4 for Kerr terms
         self.max_order = 4
         super().__init__()
 

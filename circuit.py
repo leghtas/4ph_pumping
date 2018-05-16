@@ -123,6 +123,8 @@ class Circuit(object):
 
     def __init__(self):
         self.hbar = hbar
+        self.pi = pi
+
         
         self.anyUs={}
         self.anyTs={}
@@ -150,7 +152,6 @@ class Circuit(object):
     
     
     def prepare_U_formal(self): 
-
         U_expr = parse_expr(self.U_str, evaluate=False)
         print('U = '+str(U_expr))
         U_expr_symbols = get_symbol_list(U_expr)
