@@ -94,7 +94,7 @@ if 1==0:
 # Get freqs and Kerrs v.s. flux
 if 1==1:
     for kk, xx in enumerate(phiVec):
-        res1, res2, Xi2s, Xi3s, Xi4s, check_Xi2s = c.get_freqs_kerrs(phi_ext_0=xx)
+        res1, res2, Xi2s, Xi3s, Xi4s, check_Xi2s = c.get_freqs_kerrs({'phi_ext_0':xx})
         Xi2[:, kk] = Xi2s
         Xi3[:, kk] = Xi3s
         Xi4[:, kk] = Xi4s

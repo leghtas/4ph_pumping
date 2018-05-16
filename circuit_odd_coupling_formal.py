@@ -16,13 +16,58 @@ import numdifftools as nd
 from scipy.misc import derivative
 from circuit import *
 import sympy as sp
+from sympy.parsing.sympy_parser import parse_expr
 
+def get_symbol_list(sympy_expr):
+    symbols = []
+    def get_all_symbols(_sympy_expr, _symbols):
+        for arg in _sympy_expr.args:
+            if arg.is_Symbol:
+                _symbols.append(str(arg))
+            elif len(arg.args)>0:
+                get_all_symbols(arg, _symbols)
+    get_all_symbols(sympy_expr, symbols)
+    symbols=list(set(symbols))
+    return symbols
+
+def format_diff(which, variables):
+    which_format=[]
+    for ii, var in enumerate(which):
+        for jj in range(var):
+            which_format.append(variables[ii])
+    return which_format
+
+def which_list(n, dim):
+    if n==1:
+        loc_list = []
+        for ii in range(dim):
+            loc_list.append([0 if jj!=ii else 1 for jj in range(dim)])
+        return loc_list
+    else:
+        loc_list = which_list(1, dim)
+        new_which_list = []
+        for which in which_list(n-1, dim):
+            for loc in loc_list:
+                new_which_list.append(list(np.array(which)+np.array(loc)))
+        return new_which_list
+    
+def tuple_list(n):
+    _tuple_list = [tuple(range(n))]
+    for ii in range(n-1):
+        temp_list = list(range(n))
+        temp_list[n-ii-2]=n-1
+        temp_list[n-1]=n-ii-2
+        _tuple_list.append(tuple(temp_list))
+    return _tuple_list
 
 class CircuitOddCoupling(Circuit):
 
     def __init__(self, ECa, ELa, ECb, ELb, EJ1, EJ2,
                  ECc=None, ELc=None, Ecoup=None,
                  printParams=True):
+        self.hbar = hbar
+        
+        self.varying_params={'phi_ext_s_0':0, 'phi_ext_l_0':0}
 
         # from http://arxiv.org/abs/1602.01793
         wa, Za, LJ = get_w_Z_LJ_from_E(ECa, ELa, EJ1)
@@ -87,234 +132,78 @@ class CircuitOddCoupling(Circuit):
             print("Xiab/2pi = "+str(1e-6*hbarXiab/hbar/2/pi)+" MHz")
             print("CJ per junction = "+str(CJ*1e15)+str(" fF"))
             print("kappab/kappaa limited by CJ = "+str(1/kappaa_over_kappab))
+            
+        self.prepare_U_formal()
+            
+    def remove_params(self, symbol_list):
+        variables = []
+        for symbol in symbol_list:
+            if (not symbol in self.__dict__.keys()) and (not symbol in self.varying_params.keys()):
+                variables.append(symbol)
+        variables = sorted(variables)
+        return variables
+    
+    def prepare_U_formal(self): 
+        U_str = '0.5*(ELa/hbar)*pa**2 + \
+                + 0.5*(ELb/hbar)*pb**2 + \
+                + 0.5*(ELc/hbar)*pc**2+ \
+                - (EJ/hbar)*cos(phi_ext_s_0/2)*cos(pa+pb+phi_ext_s_0/2+phi_ext_l_0) \
+                - (dEJ/hbar)*sin(phi_ext_s_0/2) * sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0)'
+        U_expr = parse_expr(U_str)
+#        print(U_expr)
+        U_expr_symbols = get_symbol_list(U_expr)
+        self.U_variables = self.remove_params(U_expr_symbols)
+        self.dim = len(self.U_variables)
 
-    def get_U(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def U(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            _U = 0.5*(self.ELa/hbar)*pa**2 + \
-                 0.5*(self.ELb/hbar)*pb**2 + \
-                 0.5*(self.ELc/hbar)*pc**2 + \
-                 -(self.EJ/hbar)*np.cos(phi_ext_s_0/2) * \
-                 np.cos(pa+pb+phi_ext_s_0/2+phi_ext_l_0) + \
-                 -(self.dEJ/hbar)*np.sin(phi_ext_s_0/2) * \
-                 np.sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
-            return _U
-        return U
-    
-    def get_U_formal(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def U(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            _U = 0.5*(self.ELa/hbar)*pa**2 + \
-                 0.5*(self.ELb/hbar)*pb**2 + \
-                 0.5*(self.ELc/hbar)*pc**2 + \
-                 -(self.EJ/hbar)*np.cos(phi_ext_s_0/2) * \
-                 np.cos(pa+pb+phi_ext_s_0/2+phi_ext_l_0) + \
-                 -(self.dEJ/hbar)*np.sin(phi_ext_s_0/2) * \
-                 np.sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
-            return _U
-        return U
-    
-    def get_dUa(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def dUa(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            _dUa = (self.ELa/hbar)*pa + \
-                 (self.EJ/hbar)*np.cos(phi_ext_s_0/2) * \
-                 np.sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0) + \
-                 -(self.dEJ/hbar)*np.sin(phi_ext_s_0/2) * \
-                 np.cos(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
-            return _dUa
-        return dUa
-    
-    def get_dUb(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def dUb(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            _dUb = (self.ELb/hbar)*pb + \
-                 (self.EJ/hbar)*np.cos(phi_ext_s_0/2) * \
-                 np.sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0) + \
-                 -(self.dEJ/hbar)*np.sin(phi_ext_s_0/2) * \
-                 np.cos(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
-            return _dUb
-        return dUb
-    
-    def get_dUc(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def dUc(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            _dUc = (self.ELc/hbar)*pc
-            return _dUc
-        return dUc
-    
-    def get_d2Uaa(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def d2Uaa(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            _d2Uaa = (self.ELa/hbar) + \
-                 (self.EJ/hbar)*np.cos(phi_ext_s_0/2) * \
-                 np.cos(pa+pb+phi_ext_s_0/2+phi_ext_l_0) + \
-                 (self.dEJ/hbar)*np.sin(phi_ext_s_0/2) * \
-                 np.sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
-            return _d2Uaa
-        return d2Uaa
-    
-    def get_d2Ubb(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def d2Ubb(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            _d2Ubb = (self.ELb/hbar) + \
-                 (self.EJ/hbar)*np.cos(phi_ext_s_0/2) * \
-                 np.cos(pa+pb+phi_ext_s_0/2+phi_ext_l_0) + \
-                 (self.dEJ/hbar)*np.sin(phi_ext_s_0/2) * \
-                 np.sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
-            return _d2Ubb
-        return d2Ubb
-    
-    def get_d2Ucc(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def d2Ucc(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            _d2Ucc = (self.ELc/hbar)
-            return _d2Ucc
-        return d2Ucc
-    
-    def get_d2Uab(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def d2Uab(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            _d2Uab = (self.EJ/hbar)*np.cos(phi_ext_s_0/2) * \
-                 np.cos(pa+pb+phi_ext_s_0/2+phi_ext_l_0) + \
-                 (self.dEJ/hbar)*np.sin(phi_ext_s_0/2) * \
-                 np.sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
-            return _d2Uab
-        return d2Uab
-    
-    def get_d2Uac(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def d2Uac(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            _d2Uac = 0
-            return _d2Uac
-        return d2Uac
-    
-    def get_d2Ubc(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def d2Ubc(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            _d2Ubc = 0
-            return _d2Ubc
-        return d2Ubc
-    
-    def get_HessU(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def HessU(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            d2Uaa_p = self.get_d2Uaa(phi_ext_s_0=phi_ext_s_0,
-                                   phi_ext_l_0=phi_ext_l_0)([pa, pb, pc])
-            d2Ubb_p = self.get_d2Ubb(phi_ext_s_0=phi_ext_s_0,
-                                   phi_ext_l_0=phi_ext_l_0)([pa, pb, pc])
-            d2Ucc_p = self.get_d2Ucc(phi_ext_s_0=phi_ext_s_0,
-                                   phi_ext_l_0=phi_ext_l_0)([pa, pb, pc])
-            d2Uab_p = self.get_d2Uab(phi_ext_s_0=phi_ext_s_0,
-                                   phi_ext_l_0=phi_ext_l_0)([pa, pb, pc])
-            d2Uac_p = self.get_d2Uac(phi_ext_s_0=phi_ext_s_0,
-                                   phi_ext_l_0=phi_ext_l_0)([pa, pb, pc])
-            d2Ubc_p = self.get_d2Ubc(phi_ext_s_0=phi_ext_s_0,
-                                   phi_ext_l_0=phi_ext_l_0)([pa, pb, pc])
-            _HessU = np.array([[d2Uaa_p, d2Uab_p, d2Uac_p],
-                               [d2Uab_p, d2Ubb_p, d2Ubc_p], 
-                               [d2Uac_p, d2Ubc_p, d2Ucc_p]])
-            _HessU1 = np.transpose(np.dot(np.transpose(_HessU,(0,1)), P),(0,1))
-            _HessU2 = np.transpose(np.dot(np.transpose(_HessU1,(1,0)), P),(1,0))
-            _HessU_basis = np.dot(np.dot(P.T, _HessU), P)
-            _HessU_basis = _HessU2
-            return _HessU_basis
-        return HessU
+        U_expr_sub = U_expr.subs(self.__dict__)
+        self.U_formal = U_expr_sub
+#        U = sp.lambdify(('pa', 'pb', 'pc'), U_expr_sub, 'numpy')
 
-    def get_d3U(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def d3U(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            _d3U = -(self.EJ/hbar)*np.cos(phi_ext_s_0/2) * \
-                 np.sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0) + \
-                 (self.dEJ/hbar)*np.sin(phi_ext_s_0/2) * \
-                 np.cos(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
-            return _d3U
-        return d3U
-
-    def get_Hess3U(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def Hess3U(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            d3U_p = self.get_d3U(phi_ext_s_0=phi_ext_s_0,
-                                   phi_ext_l_0=phi_ext_l_0)([pa, pb, pc])
-            _Hess3U = np.array([[[d3U_p, d3U_p, 0],
-                                 [d3U_p, d3U_p, 0], 
-                                 [0, 0, 0]], 
-                                [[d3U_p, d3U_p, 0],
-                                 [d3U_p, d3U_p, 0], 
-                                 [0, 0, 0]],
-                                [[0, 0, 0],
-                                 [0, 0, 0], 
-                                 [0, 0, 0]]])
-            _Hess3U1 = np.transpose(np.dot(np.transpose(_Hess3U,(0,1,2)), P),(0,1,2))
-            _Hess3U2 = np.transpose(np.dot(np.transpose(_Hess3U1,(1,0,2)), P),(1,0,2))
-            _Hess3U3 = np.transpose(np.dot(np.transpose(_Hess3U2,(2,1,0)), P),(2,1,0))
-            return _Hess3U3
-        return Hess3U
     
-    def get_d4U(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def d4U(p, P=np.identity(3)):
+    def get_anyU(self, which, parameters=None): # which should be a tuple with derivativative wanted (1,0,0) for the first one
+        if parameters is None:
+            parameters=self.varying_params      # parameters should be a dictionnary of variable parameters
+        
+        U_expr_sub = self.U_formal.subs(parameters)
+        if sum(which)==0:
+            _anyU = U_expr_sub
+        else:
+            which_format = format_diff(which, self.U_variables)
+            print(which_format)
+            _anyU = sp.diff(U_expr_sub, *which_format)
+        print(_anyU)
+        _anyU = sp.lambdify(tuple(self.U_variables), _anyU, 'numpy')
+        def anyU(p, P=np.identity(self.dim)):
+            p=P.dot(p)
+            return _anyU(*p)
+        return anyU
+    
+    def get_HessnU(self, n, parameters=None):
+        if parameters is None:
+            parameters=self.varying_params
+        def HessnU(p, P=np.identity(self.dim)):
             p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            _d4U = -(self.EJ/hbar)*np.cos(phi_ext_s_0/2) * \
-                 np.cos(pa+pb+phi_ext_s_0/2+phi_ext_l_0) + \
-                 -(self.dEJ/hbar)*np.sin(phi_ext_s_0/2) * \
-                 np.sin(pa+pb+phi_ext_s_0/2+phi_ext_l_0)
-            return _d4U
-        return d4U
+            
+            _HessnU= []
+            for which in which_list(n, self.dim):
+                _HessnU.append(self.get_anyU(which, parameters=parameters))
+            shape=[self.dim for ii in range(n)]
+            _HessnU=np.array(_HessnU).reshape(shape)
+            
+            permutations = tuple_list(self.dim)
+            for permutation in permutations:
+                _HessnU = np.transpose(np.dot(np.transpose(_HessnU,permutation), P),permutation)
+#            _HessU1 = np.transpose(np.dot(np.transpose(_HessU,(0,1)), P),(0,1))
+#            _HessU2 = np.transpose(np.dot(np.transpose(_HessU1,(1,0)), P),(1,0))
+#            _HessU_basis = np.dot(np.dot(P.T, _HessU), P)
+#            _HessU_basis = _HessU2
+#            _Hess4U1 = np.transpose(np.dot(np.transpose(_Hess4U,(0,1,2,3)), P),(0,1,2,3))
+#            _Hess4U2 = np.transpose(np.dot(np.transpose(_Hess4U1,(1,0,2,3)), P),(1,0,2,3))
+#            _Hess4U3 = np.transpose(np.dot(np.transpose(_Hess4U2,(2,1,0,3)), P),(2,1,0,3))
+#            _Hess4U4 = np.transpose(np.dot(np.transpose(_Hess4U3,(3,1,2,0)), P),(3,1,2,0))
+            return _HessnU
+        return HessnU
 
-    def get_Hess4U(self, phi_ext_s_0=0, phi_ext_l_0=0):
-        def Hess4U(p, P=np.identity(3)):
-            p = P.dot(p)
-            (pa, pb, pc) = (p[0], p[1], p[2])
-            d4U_p = self.get_d4U(phi_ext_s_0=phi_ext_s_0,
-                                   phi_ext_l_0=phi_ext_l_0)([pa, pb, pc])
-            _Hess4U = np.array([[[[d4U_p, d4U_p, 0],
-                                  [d4U_p, d4U_p, 0], 
-                                  [0, 0, 0]], 
-                                 [[d4U_p, d4U_p, 0],
-                                  [d4U_p, d4U_p, 0], 
-                                  [0, 0, 0]],
-                                 [[0, 0, 0],
-                                  [0, 0, 0], 
-                                  [0, 0, 0]]],
-                                [[[d4U_p, d4U_p, 0],
-                                  [d4U_p, d4U_p, 0], 
-                                  [0, 0, 0]], 
-                                 [[d4U_p, d4U_p, 0],
-                                  [d4U_p, d4U_p, 0], 
-                                  [0, 0, 0]],
-                                 [[0, 0, 0],
-                                  [0, 0, 0], 
-                                  [0, 0, 0]]], 
-                                [[[0, 0, 0],
-                                  [0, 0, 0], 
-                                  [0, 0, 0]], 
-                                 [[0, 0, 0],
-                                  [0, 0, 0], 
-                                  [0, 0, 0]],
-                                 [[0, 0, 0],
-                                  [0, 0, 0], 
-                                  [0, 0, 0]]]])
-            _Hess4U1 = np.transpose(np.dot(np.transpose(_Hess4U,(0,1,2,3)), P),(0,1,2,3))
-            _Hess4U2 = np.transpose(np.dot(np.transpose(_Hess4U1,(1,0,2,3)), P),(1,0,2,3))
-            _Hess4U3 = np.transpose(np.dot(np.transpose(_Hess4U2,(2,1,0,3)), P),(2,1,0,3))
-            _Hess4U4 = np.transpose(np.dot(np.transpose(_Hess4U3,(3,1,2,0)), P),(3,1,2,0))
-            return _Hess4U4
-        return Hess4U
 
     def get_T(self, phi_ext_s_0=0, phi_ext_l_0=0):
         def T(dp, P=np.identity(3)): # dp: dphi/dt
@@ -399,20 +288,24 @@ class CircuitOddCoupling(Circuit):
         else:
             raise Exception
 
-    def get_U_matrix(self, phi_ext_s_0=0, phi_ext_l_0=0, mode = 'analytical'):
-        U = self.get_U(phi_ext_s_0=phi_ext_s_0,
-                       phi_ext_l_0=phi_ext_l_0)
+    def get_U_matrix(self, parameters=None, mode = 'analytical'):
+        if parameters is None:
+            parameters=self.varying_params 
+        U = self.get_anyU((0,)*self.dim, parameters=parameters)
         if mode == 'analytical':
-            x0 = np.array([0, 0, 0])
+            x0 = np.zeros(self.dim)
             res = minimize(U, x0, method='SLSQP', tol=1e-12)
-            HessU = self.get_HessU(phi_ext_s_0=phi_ext_s_0,
-                                   phi_ext_l_0=phi_ext_l_0)
-            quad = res.x, HessU([res.x[0], res.x[1], res.x[2]])/2
+            HessU = self.get_HessnU(2, parameters=parameters)
+            quad = res.x, HessU([res.x])/2
         else:
-            quad = self.get_quadratic_form(U)
+            quad = self.get_quadratic_form(U) # not suported anymore
         return quad
 
-    def get_T_matrix(self, phi_ext_s_0=0, phi_ext_l_0=0, mode = 'analytical'):
+    def get_T_matrix(self, parameters=None, mode = 'analytical'):
+        if parameters is None:
+            parameters=self.varying_params 
+        phi_ext_s_0 = parameters['phi_ext_s_0']
+        phi_ext_l_0 = parameters['phi_ext_l_0']
         T = self.get_T(phi_ext_s_0=phi_ext_s_0,
                        phi_ext_l_0=phi_ext_l_0)
         if mode == 'analytical':
@@ -424,7 +317,7 @@ class CircuitOddCoupling(Circuit):
             quad = self.get_quadratic_form(T)
         return quad
 
-    def get_freqs_kerrs(self, phi_ext_s_0=0, phi_ext_l_0=0):
+    def get_freqs_kerrs(self, parameters=None):
         res = self.get_normal_mode_frame(phi_ext_s_0=phi_ext_s_0,
                                          phi_ext_l_0=phi_ext_l_0)
         res1, res2, P, w2 = res

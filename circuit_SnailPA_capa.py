@@ -16,41 +16,58 @@ import numdifftools as nd
 from scipy.misc import derivative
 from circuit import *
 import warnings
+import sympy as sp
+from sympy.parsing.sympy_parser import parse_expr
 
+def get_symbol_list(sympy_expr):
+    symbols = []
+    def get_all_symbols(_sympy_expr, _symbols):
+        for arg in _sympy_expr.args:
+            if arg.is_Symbol:
+                _symbols.append(str(arg))
+            elif len(arg.args)>0:
+                get_all_symbols(arg, _symbols)
+    get_all_symbols(sympy_expr, symbols)
+    symbols=list(set(symbols))
+    return symbols
 
+def format_diff(which, variables):
+    which_format=[]
+    for ii, var in enumerate(which):
+        for jj in range(var):
+            which_format.append(variables[ii])
+    return which_format
 
-def restrict_m(A, loc):
-    dim = len(np.shape(A))
-    _A = A
-    indices = []
-    for ii, elt in enumerate(loc):
-        if elt == 0:
-            indices.append(ii)
-
-    for ii, index in enumerate(indices):
-        index -= ii
-        for jj in range(dim):
-            _A = np.delete(_A, index, jj)
-    return(_A)
-
-def restrict_p(A, loc):
-    dim = len(np.shape(A))
-    _A = A
-    indices = []
-    for ii, elt in enumerate(loc):
-        if elt == 0:
-            indices.append(ii)
-
-    for ii, index in enumerate(indices):
-        index -= ii
-        _A = np.delete(_A, index, 1)
-    return(_A)
-
+def which_list(n, dim):
+    if n==1:
+        loc_list = []
+        for ii in range(dim):
+            loc_list.append([0 if jj!=ii else 1 for jj in range(dim)])
+        return loc_list
+    else:
+        loc_list = which_list(1, dim)
+        new_which_list = []
+        for which in which_list(n-1, dim):
+            for loc in loc_list:
+                new_which_list.append(list(np.array(which)+np.array(loc)))
+        return new_which_list
+    
+def tuple_list(n):
+    _tuple_list = [tuple(range(n))]
+    for ii in range(n-1):
+        temp_list = list(range(n))
+        temp_list[n-ii-2]=n-1
+        temp_list[n-1]=n-ii-2
+        _tuple_list.append(tuple(temp_list))
+    return _tuple_list
 
 class CircuitSnailPA(Circuit):
 
     def __init__(self, EC, EL, EJ, alpha, n,
                  printParams=True):
+        
+        self.hbar = hbar
+        self.varying_params={'phi_ext_0':0}
 
         # from http://arxiv.org/abs/1602.01793
         w, Z, LJ = get_w_Z_LJ_from_E(EC, EL, EJ)
@@ -99,127 +116,74 @@ class CircuitSnailPA(Circuit):
 #            print("Xiab/2pi = "+str(1e-6*hbarXiab/hbar/2/pi)+" MHz")
             print("CJ per junction = "+str(CJ*1e15)+str(" fF"))
 #            print("kappab/kappaa limited by CJ = "+str(1/kappaa_over_kappab))
+        self.prepare_U_formal()
+            
+    def remove_params(self, symbol_list):
+        variables = []
+        for symbol in symbol_list:
+            if (not symbol in self.__dict__.keys()) and (not symbol in self.varying_params.keys()):
+                variables.append(symbol)
+        variables = sorted(variables)
+        return variables
+    
+    def prepare_U_formal(self): 
+        U_str = 'EL/hbar*pr**2 \
+                 -alpha*(EJ/hbar)*cos(ps) +\
+                 -n*(EJ/hbar)*cos((phi_ext_0-ps)/n)'
+        U_expr = parse_expr(U_str)
+#        print(U_expr)
+        U_expr_symbols = get_symbol_list(U_expr)
+        self.U_variables = self.remove_params(U_expr_symbols)
+        self.dim = len(self.U_variables)
 
-    def get_U(self, phi_ext_0=0):
-        def U(p, P=np.identity(2)):
+        U_expr_sub = U_expr.subs(self.__dict__)
+        self.U_formal = U_expr_sub
+#        U = sp.lambdify(('pa', 'pb', 'pc'), U_expr_sub, 'numpy')
+
+    
+    def get_anyU(self, which, parameters=None): # which should be a tuple with derivativative wanted (1,0,0) for the first one
+        if parameters is None:
+            parameters=self.varying_params      # parameters should be a dictionnary of variable parameters
+        
+        U_expr_sub = self.U_formal.subs(parameters)
+        if sum(which)==0:
+            _anyU = U_expr_sub
+        else:
+            which_format = format_diff(which, self.U_variables)
+            _anyU = sp.diff(U_expr_sub, *which_format)
+        _anyU = sp.lambdify(tuple(self.U_variables), _anyU, 'numpy')
+        def anyU(p, P=np.identity(self.dim)):
+            p=P.dot(p)
+            return _anyU(*p)
+        return anyU
+    
+    def get_HessnU(self, n, parameters=None):
+        if parameters is None:
+            parameters=self.varying_params
+        def HessnU(p, P=np.identity(self.dim)):
+            print(p)
+            print(P)
             p = P.dot(p)
-            (ps, pr) = (p[0], p[1]) #phi_snail and phi_resonator
-            _U = (self.EL/hbar)*pr**2 + \
-                 -self.alpha*(self.EJ/hbar)*np.cos(ps) +\
-                 -self.n*(self.EJ/hbar)*np.cos((phi_ext_0-ps)/self.n)
-            return _U
-        return U
-
-    def get_U_1d(self, phi_ext_0=0):
-        def U(p, P=np.identity(2)):
-            p = P.dot(p)
-            (ps, pr) = (p[0], p[1]) #phi_snail and phi_resonator
-            _U = -self.alpha*(self.EJ/hbar)*np.cos(ps) +\
-                 -self.n*(self.EJ/hbar)*np.cos((phi_ext_0-ps)/self.n)
-            return _U
-        return U
-
-    def get_dUs(self, phi_ext_0=0):
-        def dUs(p, P=np.identity(2)):
-            p = P.dot(p)
-            (ps, pr) = (p[0], p[1])
-            _dUs = self.alpha*(self.EJ/hbar)*np.sin(ps) +\
-                 -(self.EJ/hbar)*np.sin((phi_ext_0-ps)/self.n)
-            return _dUs
-        return dUs
-
-    def get_dUr(self, phi_ext_0=0):
-        def dUr(p, P=np.identity(2)):
-            p = P.dot(p)
-            (ps, pr) = (p[0], p[1])
-            _dUr = 2*(self.EL/hbar)*pr
-            return _dUr
-        return dUr
-
-    def get_d2Uss(self, phi_ext_0=0):
-        def d2Uss(p, P=np.identity(2)):
-            p = P.dot(p)
-            (ps, pr) = (p[0], p[1])
-            _d2Uss = self.alpha*(self.EJ/hbar)*np.cos(ps) +\
-                 1/self.n*(self.EJ/hbar)*np.cos((phi_ext_0-ps)/self.n)
-            return _d2Uss
-        return d2Uss
-
-    def get_d2Urr(self, phi_ext_0=0):
-        def d2Urr(p, P=np.identity(2)):
-            p = P.dot(p)
-            (ps, pr) = (p[0], p[1])
-            _d2Urr = 2*(self.EL/hbar)
-            return _d2Urr
-        return d2Urr
-
-    def get_HessU(self, phi_ext_0=0):
-        def HessU(p, P=np.identity(2)):
-#            p = P.dot(p)
-            (ps, pr) = (p[0], p[1])
-            d2Urr_p = self.get_d2Urr(phi_ext_0=phi_ext_0)([ps, pr])
-            d2Uss_p = self.get_d2Uss(phi_ext_0=phi_ext_0)([ps, pr])
-            _HessU = np.array([[d2Uss_p, 0],
-                               [0, d2Urr_p]])
-            _HessU1 = np.transpose(np.dot(np.transpose(_HessU, (0, 1)), P), (0, 1))
-            _HessU2 = np.transpose(np.dot(np.transpose(_HessU1, (1, 0)), P), (1, 0))
-            _HessU_basis = np.dot(np.dot(P.T, _HessU), P)
-            _HessU_basis = _HessU2
-            return _HessU_basis
-        return HessU
-
-    def get_d3U(self, phi_ext_0=0):
-        def d3U(p, P=np.identity(2)):
-            p = P.dot(p)
-            (ps, pr) = (p[0], p[1])
-            _d3U = -self.alpha*(self.EJ/hbar)*np.sin(ps) +\
-                   1/self.n**2*(self.EJ/hbar)*np.sin((phi_ext_0-ps)/self.n)
-            return _d3U
-        return d3U
-
-    def get_Hess3U(self, phi_ext_0=0):
-        def Hess3U(p, P=np.identity(2)):
-#            p = P.dot(p)
-            (ps, pr) = (p[0], p[1])
-            d3U_p = self.get_d3U(phi_ext_0=phi_ext_0)([ps, pr])
-            _Hess3U = np.array([[[d3U_p, 0],
-                                 [0, 0]],
-                                [[0, 0],
-                                 [0, 0]]])
-            _Hess3U1 = np.transpose(np.dot(np.transpose(_Hess3U,(0,1,2)), P),(0,1,2))
-            _Hess3U2 = np.transpose(np.dot(np.transpose(_Hess3U1,(0,2,1)), P),(0,2,1))
-            _Hess3U3 = np.transpose(np.dot(np.transpose(_Hess3U2,(2,1,0)), P),(2,1,0))
-            return _Hess3U3
-        return Hess3U
-
-    def get_d4U(self, phi_ext_0=0):
-        def d4U(p, P=np.identity(2)):
-            p = P.dot(p)
-            (ps, pr) = (p[0], p[1])
-            _d4U = -self.alpha*(self.EJ/hbar)*np.cos(ps) +\
-                 -1/self.n**3*(self.EJ/hbar)*np.cos((phi_ext_0-ps)/self.n)
-            return _d4U
-        return d4U
-
-    def get_Hess4U(self, phi_ext_0=0):
-        def Hess4U(p, P=np.identity(2)):
-#            p = P.dot(p)
-            (ps, pr) = (p[0], p[1])
-            d4U_p = self.get_d4U(phi_ext_0=phi_ext_0)([ps, pr])
-            _Hess4U = np.array([[[[d4U_p, 0],
-                                  [0, 0]],
-                                 [[0, 0],
-                                  [0, 0]]],
-                                [[[0, 0],
-                                  [0, 0]],
-                                 [[0, 0],
-                                  [0, 0]]]])
-            _Hess4U1 = np.transpose(np.dot(np.transpose(_Hess4U,(0,1,2,3)), P),(0,1,2,3))
-            _Hess4U2 = np.transpose(np.dot(np.transpose(_Hess4U1,(0,1,3,2)), P),(0,1,3,2))
-            _Hess4U3 = np.transpose(np.dot(np.transpose(_Hess4U2,(0,3,2,1)), P),(0,3,2,1))
-            _Hess4U4 = np.transpose(np.dot(np.transpose(_Hess4U3,(3,1,2,0)), P),(3,1,2,0))
-            return _Hess4U4
-        return Hess4U
+            
+            _HessnU= []
+            for which in which_list(n, self.dim):
+                _HessnU.append(self.get_anyU(which, parameters=parameters)(p))
+            shape=[self.dim for ii in range(n)]
+            _HessnU=np.array(_HessnU).reshape(shape)
+            
+            permutations = tuple_list(self.dim)
+            for permutation in permutations:
+                _HessnU = np.transpose(np.dot(np.transpose(_HessnU, permutation), P), permutation)
+#            _HessU1 = np.transpose(np.dot(np.transpose(_HessU,(0,1)), P),(0,1))
+#            _HessU2 = np.transpose(np.dot(np.transpose(_HessU1,(1,0)), P),(1,0))
+#            _HessU_basis = np.dot(np.dot(P.T, _HessU), P)
+#            _HessU_basis = _HessU2
+#            _Hess4U1 = np.transpose(np.dot(np.transpose(_Hess4U,(0,1,2,3)), P),(0,1,2,3))
+#            _Hess4U2 = np.transpose(np.dot(np.transpose(_Hess4U1,(1,0,2,3)), P),(1,0,2,3))
+#            _Hess4U3 = np.transpose(np.dot(np.transpose(_Hess4U2,(2,1,0,3)), P),(2,1,0,3))
+#            _Hess4U4 = np.transpose(np.dot(np.transpose(_Hess4U3,(3,1,2,0)), P),(3,1,2,0))
+            return _HessnU
+        return HessnU
 
     def get_T(self, phi_ext_0=0):
         def T(dp, P=np.identity(2)): # dp: dphi/dt
@@ -287,23 +251,24 @@ class CircuitSnailPA(Circuit):
             return res.x, Hess
         else:
             raise Exception
-
-    def get_U_matrix(self, phi_ext_0=0, mode = 'analytical'):
-        U = self.get_U(phi_ext_0=phi_ext_0)
+    
+    def get_U_matrix(self, parameters=None, mode = 'analytical'):
+        if parameters is None:
+            parameters=self.varying_params 
+        U = self.get_anyU((0,)*self.dim, parameters=parameters)
         if mode == 'analytical':
-            x0 = np.array([0, 0])
-            def U1(x):
-                return U(x)/1e14
-            res = minimize(U1, x0, method='SLSQP', tol=1e-12, bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
-            if not res.success:
-                warnings.warn('Did not minimized', UserWarning)
-            HessU = self.get_HessU(phi_ext_0=phi_ext_0)
-            quad = res.x, HessU([res.x[0], res.x[1]])/2
+            x0 = np.zeros(self.dim)
+            res = minimize(U, x0, method='SLSQP', tol=1e-12)#, bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
+            HessU = self.get_HessnU(2, parameters=parameters)
+            quad = res.x, HessU(res.x)/2
         else:
-            quad = self.get_quadratic_form(U)
+            quad = self.get_quadratic_form(U) # not suported anymore
         return quad
-
-    def get_T_matrix(self, phi_ext_0=0, mode = 'analytical'):
+    
+    def get_T_matrix(self, parameters=None, mode = 'analytical'):
+        if parameters is None:
+            parameters=self.varying_params 
+        phi_ext_0 = parameters['phi_ext_0']
         T = self.get_T(phi_ext_0=phi_ext_0)
         if mode == 'analytical':
             res = np.array([0, 0])
@@ -313,35 +278,27 @@ class CircuitSnailPA(Circuit):
             quad = self.get_quadratic_form(T)
         return quad
 
-    def get_freqs_kerrs(self, phi_ext_0=0):
-        res = self.get_normal_mode_frame(phi_ext_0=phi_ext_0)
+    def get_freqs_kerrs(self, parameters):
+        if parameters is None:
+            parameters=self.varying_params 
+        res = self.get_normal_mode_frame(parameters=parameters)
         res1, res2, P, w2 = res
         fs = np.sqrt(w2)/2/np.pi
 
         # calculate Kerrs from polynomial approximation of potential
-        U = self.get_U(phi_ext_0=phi_ext_0)
 
+        Hess2U = self.get_HessnU(2, parameters=parameters)
+        Hess3U = self.get_HessnU(3, parameters=parameters)
+        Hess4U = self.get_HessnU(4, parameters=parameters)
 
-        HessU = self.get_HessU(phi_ext_0=phi_ext_0)
-        Hess3U = self.get_Hess3U(phi_ext_0=phi_ext_0)
-        Hess4U = self.get_Hess4U(phi_ext_0=phi_ext_0)
-
-        Hess_r = HessU([res1[0], res1[1]], P=P)
+        Hess2_r = Hess2U([res1[0], res1[1]], P=P)
         Hess3_r = Hess3U([res1[0], res1[1]], P=P)
         Hess4_r = Hess4U([res1[0], res1[1]], P=P)
 
-        popt2 = np.array([Hess_r[0, 0]/2, Hess_r[1, 1]/2])
+        popt2 = np.array([Hess2_r[0, 0]/2, Hess2_r[1, 1]/2])
         popt3 = np.array([Hess3_r[0, 0, 0]/6, Hess3_r[1, 1, 1]/6]) # coeff devant le phi**3
         popt4 = np.array([Hess4_r[0, 0, 0, 0]/24, Hess4_r[1, 1, 1, 1]/24]) # coeff devant le phi**4
 
-#        # In case we have too many degrees of freedom some modes do not exist
-#        # ZPF then becomes infinite so we set it to 0
-#        ZPF = np.zeros(2)
-#        for ii in range(len(popt2)):
-#            if popt2[ii]>0:
-#                ZPF[ii] = popt2[ii]**(-1./4)
-#            else:
-#                ZPF[ii] = 0
 
         ZPF = popt2**(-1./4)
 
@@ -365,16 +322,19 @@ class CircuitSnailPA(Circuit):
 #        ax.legend()
         return res1, res2, Xi2, Xi3, Xi4, check_Xi2
 
-    def get_freqs_only(self, phi_ext_0=0):
-        res = self.get_normal_mode_frame(phi_ext_0=phi_ext_0)
+    def get_freqs_only(self, parameters):
+        if parameters is None:
+            parameters=self.varying_params 
+        res = self.get_normal_mode_frame(parameters=parameters)
         res1, res2, P, w2 = res
         fs = np.sqrt(w2)/2/np.pi
         return fs
 
-    def get_normal_mode_frame(self, phi_ext_0=0):
-
-        res1, U0 = self.get_U_matrix(phi_ext_0=phi_ext_0, mode = 'analytical')
-        res2, T0 = self.get_T_matrix(phi_ext_0=phi_ext_0, mode = 'analytical')
+    def get_normal_mode_frame(self, parameters=None):
+        if parameters is None:
+            parameters=self.varying_params 
+        res1, U0 = self.get_U_matrix(parameters=parameters, mode = 'analytical')
+        res2, T0 = self.get_T_matrix(parameters=parameters, mode = 'analytical')
         
         w0, v0 = nl.eigh(T0)
         sqrtw = sl.sqrtm(np.diag(w0))
@@ -391,48 +351,3 @@ class CircuitSnailPA(Circuit):
         wU3 = np.diag(np.dot(np.dot(invP, U0), P))
 
         return res1, res2, P, wU3
-
-def true0(A):
-    A_max = np.max(np.abs(A))
-#    print(A_max)
-    shape = np.shape(A)
-    n_elts =1
-    for ii in shape:
-        n_elts *= ii
-#    print(n_elts)
-    A_r = A.reshape(n_elts)
-
-    for ii, elt  in enumerate(A_r):
-        if np.abs(elt/A_max) <1e-12:
-            A_r[ii] = 0
-    _A = A_r.reshape(shape)
-    return _A
-
-#_Hess3U = np.array([[1, 0],
-#                    [0, 0]])
-#_Hess3U = np.array([[[1, 0],
-#                     [0, 0]],
-#                    [[0, 0],
-#                     [0, 0]]])
-#P = 1/2**0.5*np.array([[ 1, -1],
-#                       [ 1,  1]])
-#
-#_HessU1 = np.transpose(np.dot(np.transpose(_HessU, (0, 1)), P), (0, 1))
-#_HessU2 = np.transpose(np.dot(np.transpose(_HessU1, (1, 0)), P), (1, 0))
-#
-#_Hess3U1 = np.transpose(np.dot(np.transpose(_Hess3U,(0,1,2)), P),(0,1,2))
-#_Hess3U2 = np.transpose(np.dot(np.transpose(_Hess3U1,(0,2,1)), P),(0,2,1))
-#_Hess3U3 = np.transpose(np.dot(np.transpose(_Hess3U2,(2,1,0)), P),(2,1,0))
-#
-#print(_HessU1)
-#print(_HessU2)
-#
-#print(_Hess3U1)
-#print(_Hess3U2)
-#print(_Hess3U3)
-#
-#print('test')
-#print(np.dot(_Hess3U, P))
-#print(np.transpose(np.dot(_Hess3U, P), (1,0,2)))
-
-print(hbar)
