@@ -9,7 +9,7 @@ import scipy.constants as sc
 import numpy as np
 import matplotlib.pyplot as plt
 import circuit
-import circuit_SnailPA_capa as cspa
+import circuit_example as cspa
 import scipy.linalg as sl
 import numpy.linalg as nl
 import numdifftools as nd

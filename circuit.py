@@ -172,7 +172,7 @@ class Circuit(object):
         T_expr_sub = T_expr.subs(self.__dict__)
         self.T_formal = T_expr_sub
     
-    def get_anyL(self, UorT, which): # which should be a tuple with derivativative wanted (1,0,0) for the first one
+    def get_anyL(self, UorT, which): # which should be a tuple with derivativative wanted (0,0) for the first one
         
         if UorT=='U':
             L_expr = self.U_formal
@@ -251,19 +251,36 @@ class Circuit(object):
         else:
             raise Exception
     
-    def get_U_matrix(self, mode = 'analytical', **kwargs):
+    def get_U_matrix(self, mode = 'analytical', globalsearch = True, **kwargs):
 
         U = self.get_any_precomp_L('U', (0,)*self.dim, **kwargs)
 #        print(U([1,2]))
         if mode == 'analytical':
-            x0 = np.zeros(self.dim)
+            if globalsearch is True:
+                Ntest = 101
+                phi_test = np.linspace(-10*pi, 10*pi, Ntest)
+                grid = np.meshgrid(*([phi_test]*self.dim))
+                grid = np.moveaxis(grid,0,-1)
+                grid = np.reshape(grid, (Ntest**self.dim,self.dim))
+                U_min = U(grid[0])
+                ii_min = 0
+                for ii in range(1,len(grid)):
+                    if U(grid[ii]) < U_min:
+                        U_min = U(grid[ii])
+                        ii_min = ii
+                ii_0 = np.unravel_index(ii_min, tuple([Ntest]*self.dim))
+                x0 = [phi_test[i] for i in ii_0]
+                print('Global minimum approximate location')
+                print(ii_0)
+            else:
+                x0 = np.zeros(self.dim)
             def U1(x):
                 return U(x)/1e14
             res = minimize(U1, x0, method='SLSQP', tol=1e-12)#, bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
             HessU = self.get_HessnL('U', 2, **kwargs)
             quad = res.x, HessU(res.x)/2
-#            print(quad)
-#            print(res.x)
+    #            print(quad)
+    #            print(res.x)
         else:
             quad = self.get_quadratic_form(U) # not suported anymore
         return quad

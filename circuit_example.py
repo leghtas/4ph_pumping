@@ -49,12 +49,17 @@ class CircuitSnailPA(c.Circuit):
         
         # Varying parameters should be stored in this dictionary
         self.varying_params={'phi_ext_0':0}
-        
+
+## Symmetric
         self.U_str = 'EL/hbar*pr**2 \
                  -NN*alpha*(EJ/hbar)*cos(ps/NN) \
-                 -NN*(n-1)*(EJ/hbar)*cos((NN*phi_ext_0-ps)/n/NN) \
-                 -NN*1*(EJ/hbar)*cos(pi-(NN*phi_ext_0-ps)/n/NN)'
-                 
+                 -NN*n*(EJ/hbar)*cos((NN*phi_ext_0-ps)/n/NN)'
+ 
+### Squid if n = 2                
+#        self.U_str = 'EL/hbar*pr**2 \
+#                 -NN*alpha*(EJ/hbar)*cos(ps/NN) \
+#                 -NN*n*(EJ/hbar)*cos((NN*phi_ext_0-ps)/n)'  
+
         self.T_str = '(1/32.)*(hbar/EC)*(2*dpr-dps)**2 \
                 + (1/16.)*(1/NN)*(alpha+1/n)*(hbar/ECj)*(dps)**2'
                 
