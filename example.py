@@ -50,7 +50,7 @@ c = cspa.CircuitSnailPA(EC, EL, EJ, alpha, n, NN=NN, printParams=True)
 
 min_phi = -4*pi
 max_phi = 4*pi
-Npts = 201
+Npts = 21
 phiVec = np.linspace(min_phi, max_phi, Npts)
 ng_sweep = np.linspace(-1, 1, 21)
 
@@ -71,7 +71,7 @@ if 1==0:
     def update(i):
         Phi_ext = np.linspace(0,2*np.pi, max_i-min_i)
         phi_ext= Phi_ext[i]
-        U = c.get_U(phi_ext_0=phi_ext)
+        U = c.get_any_precomp_L('U', (0,0), phi_ext_0=0)
         shape=(40,20)
         Ps = np.linspace(-8*np.pi, 8*np.pi, shape[0])
         Pr = np.linspace(-8*np.pi, 8*np.pi, shape[1])
@@ -85,12 +85,12 @@ if 1==0:
         return ax
 #        move_figure(fig, -1900, 10)
 
-    anim = FuncAnimation(fig, update, frames=np.arange(min_i, max_i), interval=200)
+    #anim = FuncAnimation(fig, update, frames=np.arange(min_i, max_i), interval=200)
 #    if len(sys.argv) > 1 and sys.argv[1] == 'save':
-    anim.save('line.html', dpi=80, writer='imagemagick')
+    #anim.save('line.html', dpi=80, writer='imagemagick')
 
 # Get freqs and Kerrs v.s. flux
-if 1==1:
+if 1==0:
     for kk, xx in enumerate(phiVec):
         _res  = c.get_freqs_kerrs(phi_ext_0=xx)
         res1, res2, Xi2s, Xi3s, Xi4s, check_Xi2s = _res
