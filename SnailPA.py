@@ -12,12 +12,12 @@ import circuit
 import circuit_SnailPA as cspa
 import scipy.linalg as sl
 import numpy.linalg as nl
-import numdifftools as nd
+#import numdifftools as nd
 from scipy.misc import factorial
 
 plt.close('all')
 
-w = 7.5*1e9
+w = 6.85*1e9
 Z = 50
 LJ = 1.32e-08
 I0 = 7.1*1e-6 #A EJ=phi0*I0

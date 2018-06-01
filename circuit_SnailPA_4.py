@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import scipy.linalg as sl
 import numpy.linalg as nl
 from scipy.optimize import minimize, least_squares
-import numdifftools as nd
+#import numdifftools as nd
 from scipy.misc import derivative
 from circuit import *
 import warnings

@@ -16,51 +16,42 @@ plt.ion()
 
 solve1mode = True
 solve2mode = True
-solve3mode = False
-
-params = [{'kappaao2pi' : 0.05, 'kappabo2pi' : 20, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 1 },
-          {'kappaao2pi' : 0.05, 'kappabo2pi' : 20, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 2 },
-          {'kappaao2pi' : 0.05, 'kappabo2pi' : 20, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 3 },
-          {'kappaao2pi' : 0.05, 'kappabo2pi' : 20, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 4 },
-          {'kappaao2pi' : 0.05, 'kappabo2pi' : 40, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 2 },
-          {'kappaao2pi' : 0.05, 'kappabo2pi' : 40, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 4 },
-          {'kappaao2pi' : 0.05, 'kappabo2pi' : 40, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 6 },
-          {'kappaao2pi' : 0.05, 'kappabo2pi' : 40, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 8 }
-          ]
+solve3mode = True
+ 
+params = [{'kappaao2pi' : 0.05, 'kappabo2pi' : 50, 'kappaphio2pi' : 0.05,
+           'Kerro2pi' : 0.05, 'g2o2pi' : 4, 'Nb' : 4, 'Na0' : 2,
+           'dtkappab': 16, 'chio2pi': 1, 'nth' : 0.1}]
 
 for param in params:
-    kappaa, kappab, kappaphi, Kerr, g2 = 2*np.pi*np.array([param['kappaao2pi'],
-                                                           param['kappabo2pi'],
-                                                           param['kappaphio2pi'],
-                                                           param['Kerro2pi'],
-                                                           param['g2o2pi']])
+    _params = 2*np.pi*np.array([param['kappaao2pi'], param['kappabo2pi'],
+                                param['kappaphio2pi'], param['Kerro2pi'],
+                                param['g2o2pi'], param['chio2pi']])
+    kappaa, kappab, kappaphi, Kerr, g2, chi = _params
+    Nb, Na0, dtkappab, nth = [param['Nb'], param['Na0'],
+                              param['dtkappab'], param['nth']]
 
+    b = qt.destroy(Nb)
     chiab = 2 * np.pi *0.1*0
 
     # 1 mode
     kappa2 = 4*g2**2/kappab  # MHz
 
     # 3 mode
-    chi = 2 * np.pi * 1.
-    nth = 0.2
     T1 = 10
 
-    Na = 30
-    Nb = 3
-    a = qt.destroy(Na)
-    b = qt.destroy(Nb)
-
-    nvec = np.arange(1, 10, 2)
+    nvec = [2, 4, 6]
     T = 10
-    dt = T/500.
-    tlist = np.linspace(0, T, T/dt+1)
+    dt = dtkappab / kappab
+    
     alpha0vec = [np.sqrt(nn)*np.exp(1j*np.pi/2) for nn in nvec]
 
     popups1 = []
     popups2 = []
     popups3 = []
+    t0 = time.time()
+    fig, ax = plt.subplots(3)
     for ii, alpha0 in enumerate(alpha0vec):
-        Na = 10 + int(nvec[ii] + 5*np.sqrt(nvec[ii]))
+        Na = Na0 + int(nvec[ii] + 10*np.sqrt(nvec[ii]))
         a = qt.destroy(Na)
         print(Na)
         H1 = -Kerr * a.dag()**2*a**2
@@ -112,7 +103,16 @@ for param in params:
         #T = 5/kappa2
 
         if solve1mode:
-            result = qt.mesolve(H1, psi01, tlist, c_ops1, [])
+            notok = True
+            dt0 = dt
+            while notok is True:
+                try:
+                    tlist = np.linspace(0, T, int(T/dt0)+1)
+                    result = qt.mesolve(H1, psi01, tlist, c_ops1, [])
+                    notok = False
+                except Exception:
+                    print('Dividing dt by 2')
+                    dt0 = dt0/2                    
             at = []
             alphat = []
             malphat = []
@@ -128,11 +128,22 @@ for param in params:
 
                 popup.append(np.sum(dist[0:int(Nwig/2)+1])*dx)
                 popdown.append(np.sum(dist[int(Nwig/2)+1:-1])*dx)
+            ax[0].plot(tlist, popup, '.-')
             popups1.append(popup)
 
         if solve2mode:
+            tlist = np.linspace(0, T, int(T/dt)+1)
+            notok = True
+            dt0 = dt
+            while notok is True:
+                try:
+                    tlist = np.linspace(0, T, int(T/dt0)+1)                    
+                    result2 = qt.mesolve(H2, psi02, tlist, c_ops2, [])
+                    notok = False
+                except Exception:
+                    print('Dividing dt by 2')
+                    dt0 = dt0/2
             fock0 = qt.basis(Na, 0)
-            result2 = qt.mesolve(H2, psi02, tlist, c_ops2, [])
             pop0 = []
             at2 = []
             bt2 = []
@@ -154,6 +165,7 @@ for param in params:
                 alphat2.append(qt.expect(rhoa, ketalpha0))
                 malphat2.append(qt.expect(rhoa, ketmalpha0))
                 pop0.append(qt.expect(rhoa, fock0))
+            ax[1].plot(tlist, popup, '.-')            
             popups2.append(popup)
         if solve3mode:
             result3 = qt.mesolve(H3, rho03, tlist, c_ops3, [])
@@ -175,64 +187,10 @@ for param in params:
                 popdown.append(np.sum(dist[int(Nwig/2)+1:-1])*dx)
                 alphat3.append(qt.expect(rhoa, ketalpha0))
                 malphat3.append(qt.expect(rhoa, ketmalpha0))
+            ax[2].plot(tlist, popup)
             popups3.append(popup)
-
-
-    if False:
-        fig, ax = plt.subplots()
-        if solve1mode:
-            ax.plot(tlist, np.real(at), label='real')
-            ax.plot(tlist, np.imag(at), label='imag')
-        if solve2mode:
-            ax.plot(tlist, pop0, label='pop0')
-            ax.plot(tlist, np.real(at2), label='real a 2')
-            ax.plot(tlist, np.imag(at2), label='imag a 2')
-            ax.plot(tlist, np.real(bt2), label='real b 2')
-            ax.plot(tlist, np.imag(bt2), label='imag b 2')
-        if solve3mode:
-            ax.plot(tlist, np.real(at3), label='3')
-            ax.plot(tlist, np.real(bt3), label='3')
-        ax.set_xlabel('Time (us)')
-        ax.legend()
-
-        fig2, ax2 = plt.subplots()
-        if solve1mode:
-            ax2.plot(tlist, np.real(alphat), label='one mode +alpha')
-            ax2.plot(tlist, np.real(malphat), label='one mode -alpha')
-        if solve2mode:
-            ax2.plot(tlist, np.real(alphat2), label='two mode +alpha')
-            ax2.plot(tlist, np.real(malphat2), label='two mode -alpha')
-            ax2.plot(tlist, popup, label='two mode popup')
-            ax2.plot(tlist, popdown, label='two mode popdown')
-        if solve3mode:
-            ax2.plot(tlist, np.real(alphat3), label='3 mode +alpha')
-            ax2.plot(tlist, np.real(malphat3), label='3 mode -alpha')
-            pass
-        ax2.set_xlabel('Time (us)')
-        ax2.set_ylabel('proj on alpha')
-        ax2.legend()
-
-        fig3, ax3 = plt.subplots(3)
-        if solve1mode:
-            W = qt.wigner(result.states[-1], xvec, xvec)
-            ax3[0].pcolor(xvec, xvec, W)
-        if solve2mode:
-            W2 = qt.wigner(qt.ptrace(result2.states[-1], 0), xvec, xvec)
-            ax3[1].pcolor(xvec, xvec, W2)
-
-        if solve3mode:
-            W3 = qt.wigner(qt.ptrace(result3.states[-1], 0), xvec, xvec)
-            ax3[2].pcolor(xvec, xvec, W3)
-        ax3[0].axis('equal')
-        ax3[1].axis('equal')
-        ax3[2].axis('equal')
-
-    fig, ax = plt.subplots(3)
-    for ii in range(len(popups1)):
-        ax[0].plot(tlist, popups1[ii], '.-')
-        ax[1].plot(tlist, popups2[ii], '.-')
-        if solve3mode:
-            ax[2].plot(tlist, popups3[ii])
+        t1 = time.time()
+        print('Time : %s s' % round((t1-t0),2))
 
     popups1_T = np.zeros(len(popups1))
     for ii in range(len(popups1_T)):
@@ -248,17 +206,20 @@ for param in params:
             popups3_T[ii]=popups3[ii][-1]
 
 
-    kappaphi_n = [kappaphi*n/(2*np.sinh(2*n)) for n in nvec]
+    #  (A.9) of MirrahimiNJP2015
+    kappaphi_n = [kappaphi*n/np.sinh(2*n) for n in nvec]
 
-    fig1, ax1 = plt.subplots(1)
+    fig1, ax1 = plt.subplots(1, figsize=(12,12))
     ax1.plot(nvec,-np.log10(-np.log(2*popups2_T-1)/tlist[-1]), '.-',  label='2 mode')
+    if solve3mode:
+        ax1.plot(nvec,-np.log10(-np.log(2*popups3_T-1)/tlist[-1]), '.-', label='3 mode')
     ax1.plot(nvec,-np.log10(-np.log(2*popups1_T-1)/tlist[-1]), '.-', label='1 mode')
     ax1.plot(nvec,-np.log10(kappaphi_n), '.-', label='analytics')
     ax1.legend()
     tstamp = round(time.time())
-    title = 'g2/2pi = %s, Kerr/2pi = %s, kappaa/2pi = %s, \n kappab/2pi = %s, kappaphi/2pi = %s, tstamp = %s ' % \
+    title = 'g2/2pi = %s, Kerr/2pi = %s, kappaa/2pi = %s, \n kappab/2pi = %s, kappaphi/2pi = %s, dtkappab = %s \n Na0 = %s, Nb = %s, tstamp = %s \n chi/2pi = %s, nth = %s' % \
             (np.round((g2/2/np.pi), 2), np.round((Kerr/2/np.pi), 2), np.round((kappaa/2/np.pi), 2),
-             np.round((kappab/2/np.pi), 2), np.round((kappaphi/2/np.pi), 2), tstamp)
+             np.round((kappab/2/np.pi), 2), np.round((kappaphi/2/np.pi), 2), np.round(dtkappab,1), Na0, Nb, tstamp, np.round(chi/2/np.pi,1), nth)
     ax1.set_title(title)
     ax1.set_xlabel('nbar')
     ax1.set_ylabel('log10(1/gamma[us])')

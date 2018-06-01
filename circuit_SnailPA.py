@@ -4,7 +4,7 @@ Created on Mon Feb 27 14:13:01 2017
 
 @author: leghtas
 """
-import qutip as qt
+#import qutip as qt
 import scipy.constants as sc
 import numpy as np
 import math
@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import scipy.linalg as sl
 import numpy.linalg as nl
 from scipy.optimize import minimize, least_squares
-import numdifftools as nd
+#import numdifftools as nd
 from scipy.misc import derivative
 from circuit import *
 
