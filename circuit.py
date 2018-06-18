@@ -11,8 +11,7 @@ import matplotlib.pyplot as plt
 import scipy.linalg as sl
 import numpy.linalg as nl
 from scipy.optimize import minimize, least_squares
-import numdifftools as nd
-from scipy.misc import derivative
+from scipy.misc import derivative, factorial
 import sympy as sp
 from sympy.parsing.sympy_parser import parse_expr
 
@@ -118,6 +117,11 @@ def tuple_list(n):
         _tuple_list.append(tuple(temp_list))
     return _tuple_list
 
+def get_factor(which):
+    factor = 1
+    for elt in set(which):
+        factor = factor*factorial(which.count(elt))
+    return factor
 
 class Circuit(object):
 
@@ -132,6 +136,8 @@ class Circuit(object):
         self.prepare_T_formal()
         self.store_anyL('U', self.max_order)
         self.store_anyL('T', self.max_order)
+        self.to_compare_0 = None
+        self.to_compare_2 = None
         
     def remove_params(self, symbol_list):
         variables = []
@@ -230,7 +236,7 @@ class Circuit(object):
 
 
     def get_quadratic_form(self, A, brute=False):
-        x0 = np.array([0, 0])
+        x0 = np.zeros(self.dim)
         res = minimize(A, x0, method='SLSQP', tol=1e-12)
         if res.success:
             if brute is True:
@@ -273,17 +279,19 @@ class Circuit(object):
         T = self.get_any_precomp_L('T', (0,)*self.dim, **kwargs)
 #        print(T([1,2]))
         if mode == 'analytical':
-            res = np.array([0, 0])
+            res = np.zeros(self.dim)
             HessT = self.get_HessnL('T', 2, **kwargs)
             quad = res, HessT(res)/2
         else:
             quad = self.get_quadratic_form(T)
         return quad
 
-    def get_freqs_kerrs(self, **kwargs):
+    def get_freqs_kerrs(self, particular=None, **kwargs):
 
         res = self.get_normal_mode_frame(**kwargs)
         res1, res2, P, w2 = res
+        
+
         fs = np.sqrt(w2)/2/np.pi
 
         # calculate Kerrs from polynomial approximation of potential
@@ -292,24 +300,42 @@ class Circuit(object):
         Hess3U = self.get_HessnL('U', 3,  **kwargs)
         Hess4U = self.get_HessnL('U', 4,  **kwargs)
 
-        Hess2_r = Hess2U([res1[0], res1[1]], P=P)
-        Hess3_r = Hess3U([res1[0], res1[1]], P=P)
-        Hess4_r = Hess4U([res1[0], res1[1]], P=P)
+        Hess2_r = Hess2U(res1, P=P)
+        Hess3_r = Hess3U(res1, P=P)
+        Hess4_r = Hess4U(res1, P=P)
+
+  
 
         popt2 = np.array([Hess2_r[0, 0]/2, Hess2_r[1, 1]/2])
         popt3 = np.array([Hess3_r[0, 0, 0]/6, Hess3_r[1, 1, 1]/6]) # coeff devant le phi**3
         popt4 = np.array([Hess4_r[0, 0, 0, 0]/24, Hess4_r[1, 1, 1, 1]/24]) # coeff devant le phi**4
-
-
+        
         ZPF = popt2**(-1./4)
-
+        
+        if particular is not None:
+            factor, power = get_factor(particular)
+            if len(particular)==2:
+                Hessp_r = Hess2_r
+                poptp = Hessp_r[particular[0], particular[1]]/factor
+                Xip = poptp*(ZPF[particular[0]]*ZPF[particular[0]])/2/np.pi
+            elif len(particular)==3:
+                Hessp_r = Hess3_r       
+                poptp = Hessp_r[particular[0], particular[1], particular[2]]/factor
+                Xip = poptp*(ZPF[particular[0]]*ZPF[particular[1]]*ZPF[particular[2]])/2/np.pi
+            elif len(particular)==4:
+                Hessp_r = Hess4_r 
+                poptp = Hessp_r[particular[0], particular[1], particular[2], particular[3]]/factor
+                Xip = poptp*(ZPF[particular[0]]*ZPF[particular[1]]*ZPF[particular[2]]*ZPF[particular[3]])/2/np.pi
+        else:
+            Xip = None
+            
         Xi2 = popt2*(ZPF**2)/2/np.pi # freq en Hz
         Xi3 = 2 * popt3*(ZPF**3)/2/np.pi #coeff devant a^2.a^+
         Xi4 = 6 * popt4*(ZPF**4)/2/np.pi #coeff devant a^2.a^+2
 
-        check_Xi2 = w2**0.5/2/np.pi
+#        check_Xi2 = w2**0.5/2/np.pi
 
-        return res1, res2, Xi2, Xi3, Xi4, check_Xi2
+        return res1, res2, Xi2, Xi3, Xi4, Xip
 
     def get_freqs_only(self,  **kwargs):
         res = self.get_normal_mode_frame(**kwargs)
@@ -321,13 +347,18 @@ class Circuit(object):
         res1, U0 = self.get_U_matrix(mode = 'analytical', **kwargs)
         res2, T0 = self.get_T_matrix(mode = 'analytical', **kwargs)
         
-        w0, v0 = nl.eigh(T0)
+        w0, v0 = self.reorder(*(nl.eigh(T0)), 0, debug=False)
         sqrtw = sl.sqrtm(np.diag(w0))
 
         U1 = np.dot(np.dot(nl.inv(v0), U0), v0)
         U2 = np.dot(np.dot(nl.inv(sqrtw), U1), nl.inv(sqrtw))
         w2, v2 = nl.eigh(U2)
+        
+        w2, v2 = self.reorder(w2, v2, 2, debug=False)
+
+
         P = np.dot(np.dot(v0, nl.inv(sqrtw)), v2)
+
         invP = np.dot(np.dot(nl.inv(v2), nl.inv(sqrtw)), nl.inv(v0))
 
         pseudo_invP = np.dot(np.dot(nl.inv(v2), np.diag(w0**0.5)), nl.inv(v0))
@@ -335,3 +366,89 @@ class Circuit(object):
         wU3 = np.diag(np.dot(np.dot(invP, U0), P))
 
         return res1, res2, P, wU3
+    
+    def reorder(self, values, vectors, either0_or2, debug=False):
+        dim = len(values)
+        vectors = vectors.T
+        order = []
+        
+#        print(self.to_compare_0, self.to_compare_2)
+        
+        to_compares = [self.to_compare_0, self.to_compare_2]
+        jj = int(either0_or2/2)
+        if to_compares[jj] is None:
+            to_compare = np.array(vectors)
+        else:
+            to_compare = to_compares[jj]
+            
+
+        for ii, vector in enumerate(vectors):
+            if debug:
+                print('comparison')
+                print(np.dot(to_compare, vector))
+            index_max = np.argmax(np.abs(np.dot(to_compare, vector)))
+            sgn = round(vector[index_max]/np.abs(vector[index_max]))
+#            print(sgn)
+            vectors[ii] = vector*sgn
+            order.append(index_max)
+        
+        order_bis = [[] for i in range(dim)]
+        for ii, vectorT in enumerate(vectors.T):
+            order_bis[np.argmax(np.abs(np.dot(to_compare, vectorT)))].append(ii)
+#        print(order)
+#        print(order_bis)
+        if to_compares[jj] is None:
+            to_correct = None
+            for ii in range(dim):
+                if len(order_bis[ii])==2:
+                    order_bis[ii].remove(order[ii])
+                    to_correct = order_bis[ii][0]
+                elif len(order_bis[ii])==3:
+                    print('Houston we got a problem')
+            if to_correct is not None:
+                for ii in range(dim):
+                    if len(order_bis[ii])==0:
+                        order[ii]=to_correct
+    
+    #    order_temp = list(range(dim))
+    #    pb_index = None
+    #    
+    #    indices = [[] for i in range(dim)]
+    #    for ii, elt in enumerate(order):
+    #        indices[elt].append(ii)
+    #    
+    #    
+    #    for ii, elt in enumerate(order):
+    #        if ii==0:
+    #            order_temp.remove(elt)
+    #        else:
+    #            if elt not in order[:ii]:
+    #                order_temp.remove(elt)
+    #            else:
+    #                pb_index = ii
+    #                
+    #    if pb_index is not None:
+    #        order[ii]=order_temp[0]
+        
+        vectors_ordered = [0 for i in range(dim)]         
+        values_ordered = [0 for i in range(dim)]
+        
+        for ii in range(dim):
+            vectors_ordered[order[ii]] = vectors[ii]
+            values_ordered[order[ii]] = values[ii]
+        
+                
+        if to_compares[jj] is None:
+            if either0_or2==0:
+                self.to_compare_0 = np.array(vectors_ordered)
+            elif either0_or2==2:
+                self.to_compare_2 = np.array(vectors_ordered)
+        if debug:
+            print(order)
+            print(vectors)
+            print(vectors_ordered)
+            
+        vectors_ordered = np.array(vectors_ordered).T 
+        values_ordered = np.array(values_ordered)
+    #    print(order)
+        return values_ordered, vectors_ordered
