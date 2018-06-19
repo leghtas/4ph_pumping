@@ -37,9 +37,9 @@ plt.close('all')
 wa, Za = [5*1e9*2*np.pi, 120]
 wb, Zb = [7.5*1e9*2*np.pi, 120]
 
-Cca, Ccb = [50e-15, 50e-15]
+Cca, Ccb, Cc = [30e-15, 30e-15, 10e-15]
 
-LJ, alpha, n = [100e-12, 0.1, 3]
+LJ, alpha, n = [2000e-12, 0.33, 3]
 
 
 
@@ -48,11 +48,11 @@ _, _, EJ = circuit.get_E_from_w(1, 1, LJ)
 #EJ, LJ, I0 = circuit.convert_EJ_LJ_I0(I0=I0)
 
 
-c = cp2s.CircuitPump2Snail(wa, Za, wb, Zb, Cca, Ccb, EJ, alpha, n)
+c = cp2s.CircuitPump2Snail(wa, Za, wb, Zb, Cca, Ccb, Cc, EJ, alpha, n)
 
-min_phi = -2*pi
-max_phi = 2*pi
-Npts = 201
+min_phi = 0
+max_phi = pi
+Npts = 501
 phiVec = np.linspace(min_phi, max_phi, Npts)
 ng_sweep = np.linspace(-1, 1, 21)
 
@@ -61,6 +61,8 @@ Xi3 = np.zeros((4, len(phiVec)))
 Xi4 = np.zeros((4, len(phiVec)))
 check_Xi2 = np.zeros((4, len(phiVec)))
 Xi_pa2pb = np.zeros(len(phiVec))
+Xi_ac = np.zeros(len(phiVec))
+Xi_bc = np.zeros(len(phiVec))
 resx = np.zeros(len(phiVec))
 resy = np.zeros(len(phiVec))
 
@@ -95,12 +97,14 @@ if 1==0:
 # Get freqs and Kerrs v.s. flux
 if 1==1:
     for kk, xx in enumerate(phiVec):
-        _res  = c.get_freqs_kerrs(particular=(1,1,2), phi_ext_0=xx)
+        _res  = c.get_freqs_kerrs(particulars=[(1,1,2), (1,1,3,3), (2,2,3,3)], phi_ext_0=xx)
         res1, res2, Xi2s, Xi3s, Xi4s, Xi_p = _res
         Xi2[:, kk] = Xi2s
         Xi3[:, kk] = Xi3s
         Xi4[:, kk] = Xi4s
-        Xi_pa2pb[kk] = Xi_p
+        Xi_pa2pb[kk] = Xi_p[0]
+        Xi_ac[kk] = 4*Xi_p[1]
+        Xi_bc[kk] = 4*Xi_p[2]
         resx[kk] = res1[0]
         resy[kk] = res1[1]
 
@@ -140,20 +144,26 @@ if 1==1:
     ax[0,2].set_title('c4')
 
     fig2, ax2 = plt.subplots(2,2, figsize=(16,8))
-    ax2[0,0].plot(phiVec/2/pi, Xi_pa2pb/1e6, label= '$a^2b^{+}$')
+    ax2[0,0].plot(phiVec/2/pi, Xi_pa2pb/1e6, '.', label= '$a^2b^{+}$')
+    
     dXi_pa2pb=np.diff(Xi_pa2pb)/(phiVec[1]-phiVec[0])*pi/10
-     = (phiVec[1:]+phiVec[:-1])/2
-    ax2[0,0].plot(dphiVec/2/pi, dXi_pa2pb/1e6, label= '$a^2b^{+}$')
+    dphiVec = (phiVec[1:]+phiVec[:-1])/2
+    
+    ax2[0,0].plot(dphiVec/2/pi, dXi_pa2pb/1e6, '.', label= r'$\frac{\pi}{10}*da^2b^{+}$')
     ax2[0,0].legend()
     ax2[0,0].set_ylabel('MHz')
     
-    ax2[1,0].plot(phiVec/2/pi, Xi4[1,:]/1e6, label= '$a^2a^{+2}$')
+    Xi4_1 = (Xi4[1,1:]+Xi4[1,:-1])/2
+    ax2[1,0].plot(dphiVec/2/pi, Xi4_1/1e6, '.', label= '$a^2a^{+2}$')
+    ax2[1,0].plot([min(dphiVec/2/pi), max(dphiVec/2/pi)], [0,0])
     ax2[1,0].legend()
     ax2[1,0].set_ylabel('MHz')
 
-
+    ax2[1,1].plot(phiVec/2/pi, Xi_ac/1e6, '.', label= r'$a^{+}ac^{+}c$')
+    ax2[1,1].plot(phiVec/2/pi, Xi_bc/1e6, '.', label= r'$b^{+}bc^{+}c$')
+    ax2[1,1].legend()
     
-    ax2[0,1].plot(phiVec/2/pi, dXi_pa2pb/Xi4[1], label= '$a^2b^{+}/a^2a^{+2}$')
+    ax2[0,1].plot(dphiVec/2/pi, dXi_pa2pb/Xi4_1, '.', label= '$a^2b^{+}/a^2a^{+2}$')
 #    ax[3,1].plot(phiVec/2/pi, Xi4[1,:]/1e6, label= '$b^2b^{+2}$')
     ax2[0,1].legend()
 

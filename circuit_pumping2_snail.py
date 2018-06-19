@@ -29,7 +29,7 @@ e=c.e
 
 class CircuitPump2Snail(c.Circuit):
 
-    def __init__(self, wa, Za, wb, Zb, Cca, Ccb, EJ, alpha, n, ECj = None,
+    def __init__(self, wa, Za, wb, Zb, Cca, Ccb, Cc, EJ, alpha, n, ECj = None,
                  printParams=True):
         
         # from http://arxiv.org/abs/1602.01793
@@ -51,6 +51,8 @@ class CircuitPump2Snail(c.Circuit):
         self.ELb = phi0**2/Lb
         self.ECb = e**2/2/Cb
         self.ECcb = e**2/2/Ccb
+        
+        self.ECc = e**2/2/Cc
 
         omega_plasma = 2*pi*24e9
         CJ = 1/(omega_plasma**2*LJ) # each junction has 2*LJ
@@ -72,7 +74,7 @@ class CircuitPump2Snail(c.Circuit):
                  
         self.T_str = '(1/16.)*(hbar/ECa)*(dpa)**2 \
                       + (1/16.)*(hbar/ECb)*(dpb)**2\
-                      + (1/16.)*(alpha+1/n)*(hbar/ECj)*(dpc)**2 \
+                      + (1/16.)*(alpha+1/n)*hbar*(1/ECj+1/ECc)*(dpc)**2 \
                       + (1/16.)*(hbar/ECca)*(dpca)**2 \
                       + (1/16.)*(hbar/ECcb)*(dpc+dpca+dpa-dpb)**2'
 
@@ -95,12 +97,15 @@ class CircuitPump2Snail(c.Circuit):
             print("phib_zpf = "+str(phib_zpf))
             print("nb_zpf = "+str(nb_zpf))
             
+            print("Cc = "+str(Cc*1e15)+" fF")
+            
             print("ELa/h = "+str(1e-9*self.ELa/hbar/2/pi)+" GHz")
             print("ECa/h = "+str(1e-9*self.ECa/hbar/2/pi)+" GHz")
             print("ELb/h = "+str(1e-9*self.ELb/hbar/2/pi)+" GHz")
             print("ECb/h = "+str(1e-9*self.ECb/hbar/2/pi)+" GHz")
             
-            print("LJ = "+str(LJ*1e9)+" nH")
+            print("LJ_grosse = "+str(LJ*1e9)+" nH")
+            print("LJ_petite = "+str(LJ/alpha*1e9)+" nH")
             print("CJ = "+str(CJ*1e15)+" fF")
             print("fJ = "+str(1/(LJ*CJ)**0.5*1e-9/2/pi)+" GHz")
             
@@ -121,7 +126,7 @@ class CircuitPump2Snail(c.Circuit):
         self.max_order = 4
         super().__init__()
 
-    def get_freqs_kerrs(self, particular=None, **kwargs):
+    def get_freqs_kerrs(self, particulars=None, **kwargs): #particulars should be list of tuple
 
         res = self.get_normal_mode_frame(**kwargs)
         res1, res2, P, w2 = res
@@ -140,31 +145,33 @@ class CircuitPump2Snail(c.Circuit):
         
         popt2 = np.array([Hess2_r[0, 0]/2, Hess2_r[1, 1]/2, Hess2_r[2, 2]/2, Hess2_r[3, 3]/2])
         popt3 = np.array([Hess3_r[0, 0, 0]/6, Hess3_r[1, 1, 1]/6, Hess3_r[2, 2, 2]/6, Hess3_r[3, 3, 3]/6])
-        popt4 = np.array([Hess4_r[0, 0, 0, 0]/24, Hess4_r[1, 1, 1, 1]/24, Hess4_r[2, 2, 2, 2]/24, Hess4_r[3, 3, 3, 3]/24])
+        popt4 = np.array([Hess4_r[0, 0, 0, 0]/24, Hess4_r[1, 1, 1, 1]/24, Hess4_r[2, 2, 2, 2]/24, Hess4_r[3, 3, 3, 3]/4])
         
         ZPF = popt2**(-1./4)
         
-        if particular is not None:
-            factor = get_factor(particular)
-            if len(particular)==2:
-                Hessp_r = Hess2_r
-                poptp = Hessp_r[particular[0], particular[1]]/factor
-                Xip = poptp*(ZPF[particular[0]]*ZPF[particular[0]])/2/np.pi
-            elif len(particular)==3:
-                Hessp_r = Hess3_r       
-                poptp = Hessp_r[particular[0], particular[1], particular[2]]/factor
-                Xip = poptp*(ZPF[particular[0]]*ZPF[particular[1]]*ZPF[particular[2]])/2/np.pi
-            elif len(particular)==4:
-                Hessp_r = Hess4_r 
-                poptp = Hessp_r[particular[0], particular[1], particular[2], particular[3]]/factor
-                Xip = poptp*(ZPF[particular[0]]*ZPF[particular[1]]*ZPF[particular[2]]*ZPF[particular[3]])/2/np.pi
+
+        if particulars is not None:
+            Xip = []
+            for particular in particulars:
+                factor = get_factor(particular)
+                if len(particular)==2:
+                    Hessp_r = Hess2_r
+                    poptp = Hessp_r[particular[0], particular[1]]/factor
+                    Xip.append(poptp*(ZPF[particular[0]]*ZPF[particular[0]])/2/np.pi)
+                elif len(particular)==3:
+                    Hessp_r = Hess3_r       
+                    poptp = Hessp_r[particular[0], particular[1], particular[2]]/factor
+                    Xip.append(poptp*(ZPF[particular[0]]*ZPF[particular[1]]*ZPF[particular[2]])/2/np.pi)
+                elif len(particular)==4:
+                    Hessp_r = Hess4_r 
+                    poptp = Hessp_r[particular[0], particular[1], particular[2], particular[3]]/factor
+                    Xip.append(poptp*(ZPF[particular[0]]*ZPF[particular[1]]*ZPF[particular[2]]*ZPF[particular[3]])/2/np.pi)
         else:
             Xip = None
             
         Xi2 = popt2*(ZPF**2)/2/np.pi # freq en Hz
         Xi3 = 2 * popt3*(ZPF**3)/2/np.pi #coeff devant a^2.a^+
         Xi4 = 6 * popt4*(ZPF**4)/2/np.pi #coeff devant a^2.a^+2
-
 #        check_Xi2 = w2**0.5/2/np.pi
 
         return res1, res2, Xi2, Xi3, Xi4, Xip

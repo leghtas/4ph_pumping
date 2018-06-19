@@ -386,29 +386,31 @@ class Circuit(object):
             if debug:
                 print('comparison')
                 print(np.dot(to_compare, vector))
+                
             index_max = np.argmax(np.abs(np.dot(to_compare, vector)))
             sgn = round(vector[index_max]/np.abs(vector[index_max]))
 #            print(sgn)
             vectors[ii] = vector*sgn
             order.append(index_max)
+#        print(order)
         
-        order_bis = [[] for i in range(dim)]
-        for ii, vectorT in enumerate(vectors.T):
-            order_bis[np.argmax(np.abs(np.dot(to_compare, vectorT)))].append(ii)
+#        order_bis = [[] for i in range(dim)]
+#        for ii, vectorT in enumerate(vectors.T):
+#            order_bis[np.argmax(np.abs(np.dot(to_compare, vectorT)))].append(ii)
 #        print(order)
 #        print(order_bis)
-        if to_compares[jj] is None:
-            to_correct = None
-            for ii in range(dim):
-                if len(order_bis[ii])==2:
-                    order_bis[ii].remove(order[ii])
-                    to_correct = order_bis[ii][0]
-                elif len(order_bis[ii])==3:
-                    print('Houston we got a problem')
-            if to_correct is not None:
-                for ii in range(dim):
-                    if len(order_bis[ii])==0:
-                        order[ii]=to_correct
+#        if to_compares[jj] is None:
+#            to_correct = None
+#            for ii in range(dim):
+#                if len(order_bis[ii])==2:
+#                    order_bis[ii].remove(order[ii])
+#                    to_correct = order_bis[ii][0]
+#                elif len(order_bis[ii])==3:
+#                    print('Houston we got a problem')
+#            if to_correct is not None:
+#                for ii in range(dim):
+#                    if len(order_bis[ii])==0:
+#                        order[ii]=to_correct
     
     #    order_temp = list(range(dim))
     #    pb_index = None
