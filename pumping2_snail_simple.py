@@ -9,7 +9,7 @@ import scipy.constants as sc
 import numpy as np
 import matplotlib.pyplot as plt
 import circuit
-import circuit_pumping2_snail as cp2s
+import circuit_pumping2_snail_simple as cp2s
 import scipy.linalg as sl
 import numpy.linalg as nl
 from scipy.misc import factorial
@@ -36,25 +36,24 @@ pi = np.pi
 plt.close('all')
 
 
-wa, Za = [5.8e9*2*np.pi, 120]
-wb, Zb = [9.6e9*2*np.pi, 120]#[9.6e9*2*np.pi, 120]
+wa, Za = [5e9*2*np.pi, 120]
 
-Cca, Ccb, Cc = [(252)*1e-15,(252)*1e-15, 25e-15]
+Cc = 2.8*1e-15
 
-LJ, dLJ, alpha, n = [2000e-12, 500e-12, 0.33, 3] #dLJ, linear part of inductance for sna
+LJ, alpha, n = [12000e-12/3, 1/1, 3] #dLJ, linear part of inductance for sna
+w = 10.0e9*2*pi
 
 
-
-_, _, EJ = circuit.get_E_from_w(1, 1, LJ+dLJ) #dLJ should be 0 to compute non-linearities !!!!!
+_, _, EJ = circuit.get_E_from_w(1, 1, LJ) #dLJ should be 0 to compute non-linearities !!!!!
 
 #EJ, LJ, I0 = circuit.convert_EJ_LJ_I0(I0=I0)
 
 
-c = cp2s.CircuitPump2Snail(wa, Za, wb, Zb, Cca, Ccb, Cc, EJ, alpha, n) 
+c = cp2s.CircuitPump2Snail(wa, Za, Cc, w, EJ, alpha, n) 
 
 min_phi = 0*2*pi
 max_phi = 1*2*pi
-Npts = 101
+Npts = 1001
 phiVec = np.linspace(min_phi, max_phi, Npts)
 ng_sweep = np.linspace(-1, 1, 21)
 
@@ -95,26 +94,25 @@ if 1==0:
 
 # Get freqs and Kerrs v.s. flux
 if 1==1:
-    
-    Xi2 = np.zeros((4, len(phiVec)))
-    Xi3 = np.zeros((4, len(phiVec)))
-    Xi4 = np.zeros((4, len(phiVec)))
-    check_Xi2 = np.zeros((4, len(phiVec)))
-    Xi_pa2pb = np.zeros(len(phiVec))
-    Xi_ac = np.zeros(len(phiVec))
-    Xi_bc = np.zeros(len(phiVec))
+    n_modes = 2
+    Xi2 = np.zeros((n_modes, len(phiVec)))
+    Xi3 = np.zeros((n_modes, len(phiVec)))
+    Xi4 = np.zeros((n_modes, len(phiVec)))
+    check_Xi2 = np.zeros((n_modes, len(phiVec)))
+    Xi_a2s = np.zeros(len(phiVec))
+    Xi_a2s2 = np.zeros(len(phiVec))
     resx = np.zeros(len(phiVec))
     resy = np.zeros(len(phiVec))
-    comp = np.zeros((4, 4, len(phiVec)))
+    comp = np.zeros((n_modes, n_modes, len(phiVec)))
     for kk, xx in enumerate(phiVec):
-        _res  = c.get_freqs_kerrs(particulars=[(1,1,2), (1,1,3,3), (2,2,3,3)], return_components=True, phi_ext_0=xx)
+        _res  = c.get_freqs_kerrs(particulars=[(0,0,1), (0,0,1,1)], return_components=True, phi_ext_0=xx)
         res1, res2, Xi2s, Xi3s, Xi4s, Xi_p, P= _res
         Xi2[:, kk] = Xi2s
         Xi3[:, kk] = Xi3s
-        Xi4[:, kk] = Xi4s
-        Xi_pa2pb[kk] = Xi_p[0]
-        Xi_ac[kk] = 4*Xi_p[1]
-        Xi_bc[kk] = 4*Xi_p[2]
+        Xi4[:, kk] = 2*Xi4s
+        Xi_a2s[kk] = Xi_p[0]
+#        print(Xi_p[1])
+        Xi_a2s2[kk] = 4*Xi_p[1]
         resx[kk] = res1[0]
         resy[kk] = res1[1]
         comp[:, :, kk] = (P.T) 
@@ -125,88 +123,88 @@ if 1==1:
     fig0, ax0 = plt.subplots(figsize=(12,6))
     ax0.plot(phiVec/2/pi, Xi2[0,:]/1e9, '.', label= 'f0')    
     ax0.plot(phiVec/2/pi, Xi2[1,:]/1e9, '.', label= 'f1')
-    ax0.plot(phiVec/2/pi, Xi2[2,:]/1e9, '.', label= 'f2')
-    ax0.plot(phiVec/2/pi, Xi2[3,:]/1e9, '.', label= 'f3')
+#    ax0.plot(phiVec/2/pi, Xi2[2,:]/1e9, '.', label= 'f2')
+#    ax0.plot(phiVec/2/pi, Xi2[3,:]/1e9, '.', label= 'f3')
     ax0.legend()
     ax0.set_ylabel('GHz')
+    index = np.argmin(np.abs(Xi2[1,:]-Xi2[0,:]-1e9))
+
     
-    fig00, ax00 = plt.subplots(2,2,figsize=(12,6))
-    ax00[0,0].plot(phiVec/2/pi, comp[0, 0,:], '.', label= 'f0/pa')    
-    ax00[0,0].plot(phiVec/2/pi, comp[0, 1,:], '.', label= 'f0/pb')    
-    ax00[0,0].plot(phiVec/2/pi, comp[0, 2,:], '.', label= 'f0/pc')    
-    ax00[0,0].plot(phiVec/2/pi, comp[0, 3,:], '.', label= 'f0/pca')   
-    ax00[0,0].plot(phiVec/2/pi, ((comp**2).sum(0)**0.5)[0], '.', label= 'norm') 
-
-    ax00[1,0].plot(phiVec/2/pi, comp[1, 0,:], '.', label= 'f1/pa')    
-    ax00[1,0].plot(phiVec/2/pi, comp[1, 1,:], '.', label= 'f1/pb')    
-    ax00[1,0].plot(phiVec/2/pi, comp[1, 2,:], '.', label= 'f1/pc')    
-    ax00[1,0].plot(phiVec/2/pi, comp[1, 3,:], '.', label= 'f1/pca')   
-    ax00[1,0].plot(phiVec/2/pi, ((comp**2).sum(0)**0.5)[1], '.', label= 'norm') 
-
-    ax00[0,1].plot(phiVec/2/pi, comp[2, 0,:], '.', label= 'f2/pa')    
-    ax00[0,1].plot(phiVec/2/pi, comp[2, 1,:], '.', label= 'f2/pb')    
-    ax00[0,1].plot(phiVec/2/pi, comp[2, 2,:], '.', label= 'f2/pc')    
-    ax00[0,1].plot(phiVec/2/pi, comp[2, 3,:], '.', label= 'f2/pca')   
-    ax00[0,1].plot(phiVec/2/pi, ((comp**2).sum(0)**0.5)[2], '.', label= 'norm') 
-
-    ax00[1,1].plot(phiVec/2/pi, comp[3, 0,:], '.', label= 'f3/pa')    
-    ax00[1,1].plot(phiVec/2/pi, comp[3, 1,:], '.', label= 'f3/pb')    
-    ax00[1,1].plot(phiVec/2/pi, comp[3, 2,:], '.', label= 'f3/pc')    
-    ax00[1,1].plot(phiVec/2/pi, comp[3, 3,:], '.', label= 'f3/pca')   
-    ax00[1,1].plot(phiVec/2/pi, ((comp**2).sum(0)**0.5)[3], '.', label= 'norm') 
-
-    ax00[0,0].legend()
-    ax00[0,1].legend()
-    ax00[1,0].legend()    
-    ax00[1,1].legend()
+#    fig00, ax00 = plt.subplots(2,2,figsize=(12,6))
+#    ax00[0,0].plot(phiVec/2/pi, comp[0, 0,:], '.', label= 'f0/pa')    
+#    ax00[0,0].plot(phiVec/2/pi, comp[0, 1,:], '.', label= 'f0/pb')    
+#    ax00[0,0].plot(phiVec/2/pi, comp[0, 2,:], '.', label= 'f0/pc')    
+#    ax00[0,0].plot(phiVec/2/pi, comp[0, 3,:], '.', label= 'f0/pca')   
+#    ax00[0,0].plot(phiVec/2/pi, ((comp**2).sum(0)**0.5)[0], '.', label= 'norm') 
+#
+#    ax00[1,0].plot(phiVec/2/pi, comp[1, 0,:], '.', label= 'f1/pa')    
+#    ax00[1,0].plot(phiVec/2/pi, comp[1, 1,:], '.', label= 'f1/pb')    
+#    ax00[1,0].plot(phiVec/2/pi, comp[1, 2,:], '.', label= 'f1/pc')    
+#    ax00[1,0].plot(phiVec/2/pi, comp[1, 3,:], '.', label= 'f1/pca')   
+#    ax00[1,0].plot(phiVec/2/pi, ((comp**2).sum(0)**0.5)[1], '.', label= 'norm') 
+#
+#    ax00[0,1].plot(phiVec/2/pi, comp[2, 0,:], '.', label= 'f2/pa')    
+#    ax00[0,1].plot(phiVec/2/pi, comp[2, 1,:], '.', label= 'f2/pb')    
+#    ax00[0,1].plot(phiVec/2/pi, comp[2, 2,:], '.', label= 'f2/pc')    
+#    ax00[0,1].plot(phiVec/2/pi, comp[2, 3,:], '.', label= 'f2/pca')   
+#    ax00[0,1].plot(phiVec/2/pi, ((comp**2).sum(0)**0.5)[2], '.', label= 'norm') 
+#
+#    ax00[1,1].plot(phiVec/2/pi, comp[3, 0,:], '.', label= 'f3/pa')    
+#    ax00[1,1].plot(phiVec/2/pi, comp[3, 1,:], '.', label= 'f3/pb')    
+#    ax00[1,1].plot(phiVec/2/pi, comp[3, 2,:], '.', label= 'f3/pc')    
+#    ax00[1,1].plot(phiVec/2/pi, comp[3, 3,:], '.', label= 'f3/pca')   
+#    ax00[1,1].plot(phiVec/2/pi, ((comp**2).sum(0)**0.5)[3], '.', label= 'norm') 
+#
+#    ax00[0,0].legend()
+#    ax00[0,1].legend()
+#    ax00[1,0].legend()    
+#    ax00[1,1].legend()
     
-    print('\nf0 = %.3f GHz\n'%(Xi2[0,:][0]/1e9)+'f1 = %.3f GHz\n'%(Xi2[1,:][0]/1e9)+'f2 = %.3f GHz\n'%(Xi2[2,:][0]/1e9)+'f3 = %.3f GHz\n'%(Xi2[3,:][0]/1e9))
+    print('\nf0 = %.3f GHz\n'%(Xi2[0,:][0]/1e9)+'f1 = %.3f GHz'%(Xi2[1,:][0]/1e9))
+    print('k0 = %.3f MHz\n'%(Xi4[0,:][0]/1e6)+'k1 = %.3f MHz\n'%(Xi4[1,:][0]/1e6)+'k01 = %.3f MHz'%(Xi_a2s2[0]/1e6))
     
-    fig, ax = plt.subplots(4, 4, figsize=(16,8))
+    print('\nphi_ext_opt = %.3f'%(phiVec[index]/2/pi))
+    print('f0 = %.3f GHz\n'%(Xi2[0,index]/1e9)+'f1 = %.3f GHz'%(Xi2[1,index]/1e9))
+    print('k0 = %.3f MHz\n'%(Xi4[0,index]/1e6)+'k1 = %.3f MHz\n'%(Xi4[1,index]/1e6)+'k01 = %.3f MHz'%(Xi_a2s2[index]/1e6))
+    
+    fig, ax = plt.subplots(2, 4, figsize=(16,8))
     ax[0,0].plot(phiVec/2/pi, Xi2[0,:]/1e9, '.', label= 'f0')
     ax[1,0].plot(phiVec/2/pi, Xi2[1,:]/1e9, '.', label= 'f1')
-    ax[2,0].plot(phiVec/2/pi, Xi2[2,:]/1e9, '.', label= 'f2')
-    ax[3,0].plot(phiVec/2/pi, Xi2[3,:]/1e9, '.', label= 'f3')
     ax[0,0].set_title('freq')
 
     ax[0,0].legend()
     ax[1,0].legend()
-    ax[2,0].legend()
-    ax[3,0].legend()
-    
+
     ax[0,1].plot(phiVec/2/pi, Xi3[0,:]/1e6)    
     ax[1,1].plot(phiVec/2/pi, Xi3[1,:]/1e6)
-    ax[2,1].plot(phiVec/2/pi, Xi3[2,:]/1e6)
-    ax[3,1].plot(phiVec/2/pi, Xi3[3,:]/1e6)
     ax[0,1].set_title('c3')
     
     ax[0,2].plot(phiVec/2/pi, Xi4[0,:]/1e6)    
     ax[1,2].plot(phiVec/2/pi, Xi4[1,:]/1e6)
-    ax[2,2].plot(phiVec/2/pi, Xi4[2,:]/1e6)
-    ax[3,2].plot(phiVec/2/pi, Xi4[3,:]/1e6)
     ax[0,2].set_title('c4')
 
     fig2, ax2 = plt.subplots(2,2, figsize=(16,8))
-    ax2[0,0].plot(phiVec/2/pi, Xi_pa2pb/1e6, '.', label= '$a^2b^{+}$')
+    ax2[0,0].plot(phiVec/2/pi, Xi_a2s/1e6, '.', label= '$a^2b^{+}$')
     
-    dXi_pa2pb=np.diff(Xi_pa2pb)/(phiVec[1]-phiVec[0])*pi/10
+    dXi_a2s=np.diff(Xi_a2s)/(phiVec[1]-phiVec[0])*pi/10
     dphiVec = (phiVec[1:]+phiVec[:-1])/2
     
-    ax2[0,0].plot(dphiVec/2/pi, dXi_pa2pb/1e6, '.', label= r'$\frac{\pi}{10}*da^2b^{+}$')
+    ax2[0,0].plot(dphiVec/2/pi, dXi_a2s/1e6, '.', label= r'$\frac{\pi}{10}*da^2b^{+}$')
     ax2[0,0].legend()
     ax2[0,0].set_ylabel('MHz')
     
-    Xi4_1 = (Xi4[1,1:]+Xi4[1,:-1])/2
-    ax2[1,0].plot(dphiVec/2/pi, Xi4_1/1e6, '.', label= '$a^2a^{+2}$')
+    Xi4_0 = (Xi4[0,1:]+Xi4[0,:-1])/2
+    ax2[1,0].plot(dphiVec/2/pi, Xi4_0/1e6, '.', label= '$a^2a^{+2}$')
     ax2[1,0].plot([min(dphiVec/2/pi), max(dphiVec/2/pi)], [0,0])
     ax2[1,0].legend()
     ax2[1,0].set_ylabel('MHz')
 
-    ax2[1,1].plot(phiVec/2/pi, Xi_ac/1e6, '.', label= r'$a^{+}ac^{+}c$')
-    ax2[1,1].plot(phiVec/2/pi, Xi_bc/1e6, '.', label= r'$b^{+}bc^{+}c$')
+    ax2[1,1].plot(phiVec/2/pi, Xi_a2s2/1e6, '.', label= r'$a^{+}ac^{+}c$')
+#    ax2[1,1].plot(phiVec/2/pi, Xi_bc/1e6, '.', label= r'$b^{+}bc^{+}c$')
     ax2[1,1].legend()
+    print('a2b = %.3f MHz\n'%(dXi_a2s[index]/1e6))
     
-    ax2[0,1].plot(dphiVec/2/pi, dXi_pa2pb/Xi4_1, '.', label= '$a^2b^{+}/a^2a^{+2}$')
+    ax2[0,1].plot(dphiVec/2/pi, dXi_a2s/Xi4_0, '.', label= '$da^2b^{+}/a^2a^{+2}$')
 #    ax[3,1].plot(phiVec/2/pi, Xi4[1,:]/1e6, label= '$b^2b^{+2}$')
     ax2[0,1].legend()
 

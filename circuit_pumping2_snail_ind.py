@@ -29,7 +29,7 @@ e=c.e
 
 class CircuitPump2Snail(c.Circuit):
 
-    def __init__(self, wa, Za, wb, Zb, Cca, Ccb, Cc, EJ, alpha, n, ECj = None,
+    def __init__(self, wa, Za, wb, Zb, Cca, Ccb, Cc, EJ, dLJ, alpha, n, ECj = None,
                  printParams=True):
         
         # from http://arxiv.org/abs/1602.01793
@@ -61,6 +61,8 @@ class CircuitPump2Snail(c.Circuit):
         self.ECj = ECj
         
         self.EJ = EJ
+        dLJ = dLJ/2
+        self.dELJ = phi0**2/dLJ
         self.n = n
         self.alpha = alpha
         
@@ -70,15 +72,17 @@ class CircuitPump2Snail(c.Circuit):
         
         self.U_str = 'ELa/2/hbar*pa**2 \
                       + ELb/2/hbar*pb**2 \
-                      -alpha*(EJ/hbar)*cos(pc) \
-                      -n*(EJ/hbar)*cos((phi_ext_0-pc)/n) \
+                      + 2* dELJ/2/hbar*pcl**2 \
+                      - alpha*(EJ/hbar)*cos(pc) \
+                      - n*(EJ/hbar)*cos((phi_ext_0-pc)/n) \
                       + 0.0*ELb/2/hbar*pca**2'
                  
         self.T_str = '(1/16.)*(hbar/ECa)*(dpa)**2 \
                       + (1/16.)*(hbar/ECb)*(dpb)**2\
-                      + (1/16.)*(alpha+1/n)*hbar*(1/ECj+1/ECc)*(dpc)**2 \
+                      + (1/16.)*(hbar/ECc)*(2*dpcl+dpc)**2\
+                      + (1/16.)*(alpha+1/n)*hbar*1/ECj*(dpc)**2 \
                       + (1/16.)*(hbar/ECca)*(dpca)**2 \
-                      + (1/16.)*(hbar/ECcb)*(dpc+dpca+dpa-dpb)**2'
+                      + (1/16.)*(hbar/ECcb)*(dpc+dpca+dpa+2*dpcl-dpb)**2'
                       # + (1/16.)*(hbar/ECca)*(dpc+dpca+dpa-dpb)**2'
 
                 
@@ -146,12 +150,11 @@ class CircuitPump2Snail(c.Circuit):
         Hess3_r = Hess3U(res1, P=P)
         Hess4_r = Hess4U(res1, P=P)
         
-        popt2 = np.array([Hess2_r[0, 0]/2, Hess2_r[1, 1]/2, Hess2_r[2, 2]/2, Hess2_r[3, 3]/2])
-        popt3 = np.array([Hess3_r[0, 0, 0]/6, Hess3_r[1, 1, 1]/6, Hess3_r[2, 2, 2]/6, Hess3_r[3, 3, 3]/6])
-        popt4 = np.array([Hess4_r[0, 0, 0, 0]/24, Hess4_r[1, 1, 1, 1]/24, Hess4_r[2, 2, 2, 2]/24, Hess4_r[3, 3, 3, 3]/4])
+        popt2 = np.array([Hess2_r[0, 0]/2, Hess2_r[1, 1]/2, Hess2_r[2, 2]/2, Hess2_r[3, 3]/2, Hess2_r[4, 4]/2])
+        popt3 = np.array([Hess3_r[0, 0, 0]/6, Hess3_r[1, 1, 1]/6, Hess3_r[2, 2, 2]/6, Hess3_r[3, 3, 3]/6, Hess3_r[4, 4, 4]/2])
+        popt4 = np.array([Hess4_r[0, 0, 0, 0]/24, Hess4_r[1, 1, 1, 1]/24, Hess4_r[2, 2, 2, 2]/24, Hess4_r[3, 3, 3, 3]/4, Hess4_r[4, 4, 4, 4]/4])
         
-        ZPF = popt2**(-1./4)
-        
+        ZPF = popt2**(-1./4)/4**0.5
 
         if particulars is not None:
             Xip = []
@@ -172,7 +175,7 @@ class CircuitPump2Snail(c.Circuit):
         else:
             Xip = None
             
-        Xi2 = popt2*(ZPF**2)/2/np.pi # freq en Hz
+        Xi2 = 4 * popt2*(ZPF**2)/2/np.pi # freq en Hz
         Xi3 = 2 * popt3*(ZPF**3)/2/np.pi #coeff devant a^2.a^+
         Xi4 = 6 * popt4*(ZPF**4)/2/np.pi #coeff devant a^2.a^+2
 #        check_Xi2 = w2**0.5/2/np.pi

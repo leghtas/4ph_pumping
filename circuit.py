@@ -123,6 +123,20 @@ def get_factor(which):
         factor = factor*factorial(which.count(elt))
     return factor
 
+def permute(to_add, old=[]):
+    new = []
+    for _to_add in to_add:
+        new_list = old+[_to_add]
+        new_to_add = to_add.copy()
+        new_to_add.remove(_to_add)
+        if len(new_to_add)>=1:
+            permuted = permute(new_to_add, new_list)
+            for perm in permuted:
+                new.append(perm)
+        else:
+            new.append(new_list)
+    return new
+
 class Circuit(object):
 
     def __init__(self):
@@ -138,6 +152,7 @@ class Circuit(object):
         self.store_anyL('T', self.max_order)
         self.to_compare_0 = None
         self.to_compare_2 = None
+        self.permutations = None
         
     def remove_params(self, symbol_list):
         variables = []
@@ -286,7 +301,7 @@ class Circuit(object):
             quad = self.get_quadratic_form(T)
         return quad
 
-    def get_freqs_kerrs(self, particular=None, **kwargs):
+    def get_freqs_kerrs(self, particular=None, return_components=False, **kwargs):
 
         res = self.get_normal_mode_frame(**kwargs)
         res1, res2, P, w2 = res
@@ -310,7 +325,7 @@ class Circuit(object):
         popt3 = np.array([Hess3_r[0, 0, 0]/6, Hess3_r[1, 1, 1]/6]) # coeff devant le phi**3
         popt4 = np.array([Hess4_r[0, 0, 0, 0]/24, Hess4_r[1, 1, 1, 1]/24]) # coeff devant le phi**4
         
-        ZPF = popt2**(-1./4)
+        ZPF = popt2**(-1./4)/4**0.5 # hbar*w/2 is the term in front of a^+.a in the hamiltonian coming from phi**2, the other half is from dphi**2 
         
         if particular is not None:
             factor, power = get_factor(particular)
@@ -329,13 +344,16 @@ class Circuit(object):
         else:
             Xip = None
             
-        Xi2 = popt2*(ZPF**2)/2/np.pi # freq en Hz
-        Xi3 = 2 * popt3*(ZPF**3)/2/np.pi #coeff devant a^2.a^+
+        # factor 4 see former remark so in front of phi**2 we got w/4 (one 2 come from developping (a^+ + a)**2, the other from the kinetic part)
+        Xi2 = 4 * popt2*(ZPF**2)/2/np.pi # freq en Hz : coeff devant a^+.a (*2 to get whole freq)
+        Xi3 = 3 * popt3*(ZPF**3)/2/np.pi #coeff devant a^2.a^+
         Xi4 = 6 * popt4*(ZPF**4)/2/np.pi #coeff devant a^2.a^+2
 
 #        check_Xi2 = w2**0.5/2/np.pi
-
-        return res1, res2, Xi2, Xi3, Xi4, Xip
+        if return_components:
+            return res1, res2, Xi2, Xi3, Xi4, Xip
+        else:
+            return res1, res2, Xi2, Xi3, Xi4, Xip, P
 
     def get_freqs_only(self,  **kwargs):
         res = self.get_normal_mode_frame(**kwargs)
@@ -347,17 +365,21 @@ class Circuit(object):
         res1, U0 = self.get_U_matrix(mode = 'analytical', **kwargs)
         res2, T0 = self.get_T_matrix(mode = 'analytical', **kwargs)
         
-        w0, v0 = self.reorder(*(nl.eigh(T0)), 0, debug=False)
+        w0, v0 = nl.eigh(T0)
+#        w0, v0 = self.reorder(*(nl.eigh(T0)), 0, debug=False)
         sqrtw = sl.sqrtm(np.diag(w0))
 
         U1 = np.dot(np.dot(nl.inv(v0), U0), v0)
         U2 = np.dot(np.dot(nl.inv(sqrtw), U1), nl.inv(sqrtw))
         w2, v2 = nl.eigh(U2)
         
-        w2, v2 = self.reorder(w2, v2, 2, debug=False)
+#        w2, v2 = self.reorder(w2, v2, 2, debug=False)
 
 
         P = np.dot(np.dot(v0, nl.inv(sqrtw)), v2)
+#        print(w0)
+        
+        w2, P = self.reorder(w2, P, 2)
 
         invP = np.dot(np.dot(nl.inv(v2), nl.inv(sqrtw)), nl.inv(v0))
 
@@ -365,33 +387,60 @@ class Circuit(object):
         
         wU3 = np.diag(np.dot(np.dot(invP, U0), P))
 
-        return res1, res2, P, wU3
+        return res1, res2, P, w2
     
     def reorder(self, values, vectors, either0_or2, debug=False):
         dim = len(values)
         vectors = vectors.T
         order = []
+        if either0_or2 ==2:
+#            print(vectors)
+            val, vec = nl.eigh(vectors.T)
+#            print('val propres 0 =' +str(val))
         
 #        print(self.to_compare_0, self.to_compare_2)
         
         to_compares = [self.to_compare_0, self.to_compare_2]
         jj = int(either0_or2/2)
         if to_compares[jj] is None:
-            to_compare = np.array(vectors)
+            to_compare = np.eye(dim)
+            self.permutations = permute([ii for ii in range(dim)])
         else:
-            to_compare = to_compares[jj]
+            to_compare = np.eye(dim)
+#            to_compare = to_compares[jj]
             
-
+        distances = []
+        sgns = []
         for ii, vector in enumerate(vectors):
             if debug:
                 print('comparison')
                 print(np.dot(to_compare, vector))
-                
-            index_max = np.argmax(np.abs(np.dot(to_compare, vector)))
-            sgn = round(vector[index_max]/np.abs(vector[index_max]))
-#            print(sgn)
-            vectors[ii] = vector*sgn
+            dists, sgn = comp_dist(vector, to_compare)
+            distances.append(dists)
+            sgns.append(sgn)
+#            if either0_or2==2:
+#                print(dists)
+            index_max = np.argmin(dists)
+#            vectors[ii] = vector*sgn
             order.append(index_max)
+        
+        best_sum_dist = np.inf
+        best_perm = None
+        for perm in self.permutations:
+            sum_dist = 0
+            for ii in perm:
+                sum_dist += distances[ii][perm[ii]]
+            if sum_dist<best_sum_dist:
+                best_perm = perm
+                best_sum_dist = sum_dist
+                
+        order=best_perm
+#        order=[0,1,2,3,4]
+        for ii in range(dim):
+            vectors[ii]=vectors[ii]*sgns[ii][order[ii]]
+#        if either0_or2==2:
+#            print(order)
+        
 #        print(order)
         
 #        order_bis = [[] for i in range(dim)]
@@ -454,3 +503,13 @@ class Circuit(object):
         values_ordered = np.array(values_ordered)
     #    print(order)
         return values_ordered, vectors_ordered
+    
+def comp_dist(a, b):
+    ret=[]
+    sgn=[]
+    for ii in b:
+        dists = np.array([(((a-ii)**2).sum())**0.5, (((a+ii)**2).sum())**0.5])
+        argmin = np.argmin(dists)
+        ret.append(dists[argmin])
+        sgn.append(argmin*(-2)+1)
+    return np.array(ret), np.array(sgn)

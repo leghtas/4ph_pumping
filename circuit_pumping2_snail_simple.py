@@ -29,11 +29,13 @@ e=c.e
 
 class CircuitPump2Snail(c.Circuit):
 
-    def __init__(self, wa, Za, wb, Zb, Cca, Ccb, Cc, EJ, alpha, n, ECj = None,
+    def __init__(self, wa, Za, Cc, w, EJ, alpha, n, ECj = None,
                  printParams=True):
         
         # from http://arxiv.org/abs/1602.01793
         _, _, LJ = c.get_w_Z_LJ_from_E(1, 1, EJ)
+        Leq = 1/(alpha+1/n)*LJ 
+        _, _, Eeq = c.get_E_from_w(1, 1, Leq) 
         
         phia_zpf = (1/phi0) * (np.sqrt((hbar/2)*Za))  # phiZPF
         na_zpf = (1/(2*e)) * (np.sqrt(hbar/2/Za))  # nZPF
@@ -41,44 +43,35 @@ class CircuitPump2Snail(c.Circuit):
         La = Za/wa
         self.ELa = phi0**2/La
         self.ECa = e**2/2/Ca
-        self.ECca = e**2/2/Cca
-        
-        
-        phib_zpf = (1/phi0) * (np.sqrt((hbar/2)*Zb))  # phiZPF
-        nb_zpf = (1/(2*e)) * (np.sqrt(hbar/2/Zb))  # nZPF
-        Cb = 1/(Zb*wb)
-        Lb = Zb/wb
-        self.ELb = phi0**2/Lb
-        self.ECb = e**2/2/Cb
-        self.ECcb = e**2/2/Ccb
         
         self.ECc = e**2/2/Cc
 
-        omega_plasma = 2*pi*24e9
-        CJ = 1/(omega_plasma**2*LJ) # each junction has 2*LJ
-        if ECj == None:
-            ECj = e**2/2/CJ
-        self.ECj = ECj
+#        omega_plasma = 2*pi*24e9
+#        CJ = 1/(omega_plasma**2*LJ) # each junction has 2*LJ
+#        if ECj == None:
+#            ECj = e**2/2/CJ
+#        self.ECj = ECj
         
         self.EJ = EJ
+        self.EJ = EJ
+        self.EC = (hbar*w)**2/8/Eeq
         self.n = n
         self.alpha = alpha
-        
         self.varying_params={'phi_ext_0':0}
 #        self.phi_ext_0 = 0
 #        self.varying_params={'ECca':0}
         
         self.U_str = 'ELa/2/hbar*pa**2 \
-                      + ELb/2/hbar*pb**2 \
-                      -alpha*(EJ/hbar)*cos(pc) \
-                      -n*(EJ/hbar)*cos((phi_ext_0-pc)/n) \
-                      + 0.0*ELb/2/hbar*pca**2'
+                      - alpha*(EJ/hbar)*cos(ps) \
+                      - n*(EJ/hbar)*cos((phi_ext_0-ps)/n)'
+#                      - EJ/hbar*cos(ps)+0*phi_ext_0'
                  
         self.T_str = '(1/16.)*(hbar/ECa)*(dpa)**2 \
-                      + (1/16.)*(hbar/ECb)*(dpb)**2\
-                      + (1/16.)*(alpha+1/n)*hbar*(1/ECj+1/ECc)*(dpc)**2 \
-                      + (1/16.)*(hbar/ECca)*(dpca)**2 \
-                      + (1/16.)*(hbar/ECcb)*(dpc+dpca+dpa-dpb)**2'
+                      + (1/16.)*(hbar/EC)*(dps)**2\
+                      + (1/16.)*(hbar/ECc)*(dps-dpa)**2'
+#                      + (1/16.)*(alpha+1/n)*hbar*(1/ECj+1/ECc)*(dpc)**2 \
+#                      + (1/16.)*(hbar/ECca)*(dpca)**2 \
+#                      + (1/16.)*(hbar/ECcb)*(dpc+dpca+dpa-dpb)**2'
                       # + (1/16.)*(hbar/ECca)*(dpc+dpca+dpa-dpb)**2'
 
                 
@@ -88,39 +81,29 @@ class CircuitPump2Snail(c.Circuit):
             print("Za = "+str(Za)+"Ohm")
             print("La = "+str(La*1e9)+" nH")
             print("Ca = "+str(Ca*1e15)+" fF")
-            print("Cca = "+str(Cca*1e15)+" fF")
             print("phia_zpf = "+str(phia_zpf))
             print("na_zpf = "+str(na_zpf))
-            
-            print("fb = "+str(wb/2/pi*1e-9)+"GHz")
-            print("Zb = "+str(Zb)+"Ohm")
-            print("Lb = "+str(Lb*1e9)+" nH")
-            print("Cb = "+str(Cb*1e15)+" fF")
-            print("Ccb = "+str(Cca*1e15)+" fF")
-            print("phib_zpf = "+str(phib_zpf))
-            print("nb_zpf = "+str(nb_zpf))
             
             print("Cc = "+str(Cc*1e15)+" fF")
             
             print("ELa/h = "+str(1e-9*self.ELa/hbar/2/pi)+" GHz")
             print("ECa/h = "+str(1e-9*self.ECa/hbar/2/pi)+" GHz")
-            print("ELb/h = "+str(1e-9*self.ELb/hbar/2/pi)+" GHz")
-            print("ECb/h = "+str(1e-9*self.ECb/hbar/2/pi)+" GHz")
             
+            print('Leq = %.3f nH'%(Leq/1e-9))
             print("LJ_grosse = "+str(LJ*1e9)+" nH")
             print("LJ_petite = "+str(LJ/alpha*1e9)+" nH")
-            print("CJ = "+str(CJ*1e15)+" fF")
-            print("fJ = "+str(1/(LJ*CJ)**0.5*1e-9/2/pi)+" GHz")
+#            print("CJ = "+str(CJ*1e15)+" fF")
+#            print("fJ = "+str(1/(LJ*CJ)**0.5*1e-9/2/pi)+" GHz")
             
-            LJ_snail = 1/(alpha+1/n)*LJ
-            CJ_snail = (alpha+1/n)*CJ
-            print("LJ_snail = "+str(LJ_snail*1e9)+" nH")
-            print("CJ_snail = "+str(CJ_snail*1e15)+" fF")
-            print("f_snail = "+str(1/(LJ_snail*CJ_snail)**0.5*1e-9/2/pi)+" GHz")
+#            LJ_snail = 1/(alpha+1/n)*LJ
+#            CJ_snail = (alpha+1/n)*CJ
+#            print("LJ_snail = "+str(LJ_snail*1e9)+" nH")
+#            print("CJ_snail = "+str(CJ_snail*1e15)+" fF")
+#            print("f_snail = "+str(1/(LJ_snail*CJ_snail)**0.5*1e-9/2/pi)+" GHz")
             
             print("EJ/h = "+str(1e-9*self.EJ/hbar/2/pi)+" GHz")
 
-            print("CJ per junction = "+str(CJ*1e15)+str(" fF"))
+#            print("CJ per junction = "+str(CJ*1e15)+str(" fF"))
             
             
 
@@ -146,12 +129,11 @@ class CircuitPump2Snail(c.Circuit):
         Hess3_r = Hess3U(res1, P=P)
         Hess4_r = Hess4U(res1, P=P)
         
-        popt2 = np.array([Hess2_r[0, 0]/2, Hess2_r[1, 1]/2, Hess2_r[2, 2]/2, Hess2_r[3, 3]/2])
-        popt3 = np.array([Hess3_r[0, 0, 0]/6, Hess3_r[1, 1, 1]/6, Hess3_r[2, 2, 2]/6, Hess3_r[3, 3, 3]/6])
-        popt4 = np.array([Hess4_r[0, 0, 0, 0]/24, Hess4_r[1, 1, 1, 1]/24, Hess4_r[2, 2, 2, 2]/24, Hess4_r[3, 3, 3, 3]/4])
+        popt2 = np.array([Hess2_r[0, 0]/2, Hess2_r[1, 1]/2])
+        popt3 = np.array([Hess3_r[0, 0, 0]/6, Hess3_r[1, 1, 1]/6])
+        popt4 = np.array([Hess4_r[0, 0, 0, 0]/24, Hess4_r[1, 1, 1, 1]/24])
         
-        ZPF = popt2**(-1./4)
-        
+        ZPF = popt2**(-1./4)/4**0.5 # hbar*w/2 is the term in front of a^+.a in the hamiltonian coming from phi**2, the other half is from dphi**2 
 
         if particulars is not None:
             Xip = []
@@ -172,8 +154,9 @@ class CircuitPump2Snail(c.Circuit):
         else:
             Xip = None
             
-        Xi2 = popt2*(ZPF**2)/2/np.pi # freq en Hz
-        Xi3 = 2 * popt3*(ZPF**3)/2/np.pi #coeff devant a^2.a^+
+        # factor 4 see former remark so in front of phi**2 we got w/4 (one 2 come from developping (a^+ + a)**2, the other from the kinetic part)
+        Xi2 = 4 * popt2*(ZPF**2)/2/np.pi # freq en Hz : coeff devant a^+.a (*2 to get whole freq)
+        Xi3 = 3 * popt3*(ZPF**3)/2/np.pi #coeff devant a^2.a^+
         Xi4 = 6 * popt4*(ZPF**4)/2/np.pi #coeff devant a^2.a^+2
 #        check_Xi2 = w2**0.5/2/np.pi
         if return_components:
