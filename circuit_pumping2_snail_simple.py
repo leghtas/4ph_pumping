@@ -112,57 +112,82 @@ class CircuitPump2Snail(c.Circuit):
         self.max_order = 4
         super().__init__()
 
-    def get_freqs_kerrs(self, particulars=None, return_components=False, **kwargs): #particulars should be list of tuple
-
+    def get_freqs_kerrs(self, particulars=None, return_components=False, max_solutions=1, **kwargs): #particulars should be list of tuple
         res = self.get_normal_mode_frame(**kwargs)
-        res1, res2, P, w2 = res
-
-        fs = np.sqrt(w2)/2/np.pi
+        res1s, res2, Ps, w2s = res
+        
+        res1s = list(res1s)
+        Ps = list(Ps)
+        
+        fs = np.sqrt(w2s)/2/np.pi
 
         # calculate Kerrs from polynomial approximation of potential
-
         Hess2U = self.get_HessnL('U', 2,  **kwargs)
         Hess3U = self.get_HessnL('U', 3,  **kwargs)
         Hess4U = self.get_HessnL('U', 4,  **kwargs)
-
-        Hess2_r = Hess2U(res1, P=P)
-        Hess3_r = Hess3U(res1, P=P)
-        Hess4_r = Hess4U(res1, P=P)
         
-        popt2 = np.array([Hess2_r[0, 0]/2, Hess2_r[1, 1]/2])
-        popt3 = np.array([Hess3_r[0, 0, 0]/6, Hess3_r[1, 1, 1]/6])
-        popt4 = np.array([Hess4_r[0, 0, 0, 0]/24, Hess4_r[1, 1, 1, 1]/24])
-        
-        ZPF = popt2**(-1./4)/4**0.5 # hbar*w/2 is the term in front of a^+.a in the hamiltonian coming from phi**2, the other half is from dphi**2 
-
-        if particulars is not None:
-            Xip = []
-            for particular in particulars:
-                factor = get_factor(particular)
-                if len(particular)==2:
-                    Hessp_r = Hess2_r
-                    poptp = Hessp_r[particular[0], particular[1]]/factor
-                    Xip.append(poptp*(ZPF[particular[0]]*ZPF[particular[0]])/2/np.pi)
-                elif len(particular)==3:
-                    Hessp_r = Hess3_r       
-                    poptp = Hessp_r[particular[0], particular[1], particular[2]]/factor
-                    Xip.append(poptp*(ZPF[particular[0]]*ZPF[particular[1]]*ZPF[particular[2]])/2/np.pi)
-                elif len(particular)==4:
-                    Hessp_r = Hess4_r 
-                    poptp = Hessp_r[particular[0], particular[1], particular[2], particular[3]]/factor
-                    Xip.append(poptp*(ZPF[particular[0]]*ZPF[particular[1]]*ZPF[particular[2]]*ZPF[particular[3]])/2/np.pi)
-        else:
-            Xip = None
+        Xi2s = []
+        Xi3s = []
+        Xi4s = []
+        Xips = []
+        for res1, P in zip(res1s, Ps):
+            Hess2_r = Hess2U(res1, P=P)
+            Hess3_r = Hess3U(res1, P=P)
+            Hess4_r = Hess4U(res1, P=P)
             
-        # factor 4 see former remark so in front of phi**2 we got w/4 (one 2 come from developping (a^+ + a)**2, the other from the kinetic part)
-        Xi2 = 4 * popt2*(ZPF**2)/2/np.pi # freq en Hz : coeff devant a^+.a (*2 to get whole freq)
-        Xi3 = 3 * popt3*(ZPF**3)/2/np.pi #coeff devant a^2.a^+
-        Xi4 = 6 * popt4*(ZPF**4)/2/np.pi #coeff devant a^2.a^+2
-#        check_Xi2 = w2**0.5/2/np.pi
+            popt2 = np.array([Hess2_r[ii, ii]/2 for ii in range(self.dim)])
+            popt3 = np.array([Hess3_r[ii, ii, ii]/6 for ii in range(self.dim)])
+            popt4 = np.array([Hess4_r[ii, ii, ii, ii]/24 for ii in range(self.dim)])
+            
+            ZPF = popt2**(-1./4)/4**0.5 # hbar*w/2 is the term in front of a^+.a in the hamiltonian coming from phi**2, the other half is from dphi**2 
+    
+            if particulars is not None:
+                Xip = []
+                for particular in particulars:
+                    factor = get_factor(particular)
+                    if len(particular)==2:
+                        poptp = Hess2_r[particular]/factor
+                        Xip.append(poptp*(ZPF[particular[0]]*ZPF[particular[0]])/2/np.pi)
+                    elif len(particular)==3:
+                        poptp = Hess3_r[particular]/factor
+                        Xip.append(poptp*(ZPF[particular[0]]*ZPF[particular[1]]*ZPF[particular[2]])/2/np.pi)
+                    elif len(particular)==4:
+                        poptp = Hess4_r[particular]/factor
+                        Xip.append(poptp*(ZPF[particular[0]]*ZPF[particular[1]]*ZPF[particular[2]]*ZPF[particular[3]])/2/np.pi)
+                Xip = np.array(Xip)
+            else:
+                Xip = None
+                
+            # factor 4 see former remark so in front of phi**2 we got w/4 (one 2 come from developping (a^+ + a)**2, the other from the kinetic part)
+            Xi2 = 4 * popt2*(ZPF**2)/2/np.pi # freq en Hz : coeff devant a^+.a (*2 to get whole freq)
+            Xi3 = 3 * popt3*(ZPF**3)/2/np.pi #coeff devant a^2.a^+
+            Xi4 = 6 * popt4*(ZPF**4)/2/np.pi #coeff devant a^2.a^+2
+            
+            Xi2s.append(Xi2)
+            Xi3s.append(Xi3)
+            Xi4s.append(Xi4)
+            Xips.append(Xip)
+    #        check_Xi2 = w2**0.5/2/np.pi
+        n_solutions = len(Xi2s)
+        if len(Xi2s)<max_solutions:
+            for ii, item in enumerate([Xi2s, Xi3s, Xi4s, res1s, Xips, Ps]):
+                if item[0] is not None:
+                    to_add = np.nan*np.ones(item[0].shape)
+                    to_adds = [to_add]*(max_solutions-n_solutions)
+                    item += to_adds
+                else:
+                    to_adds = [None]*(max_solutions-n_solutions)
+                    item += to_adds
+                    
+        return_list = [Xi2s, Xi3s, Xi4s, res1s, Xips, Ps]
+        for ii, item in enumerate(return_list):
+            return_list[ii] = np.array(item[:max_solutions])
+        Xi2s, Xi3s, Xi4s, res1s, Xips, Ps = return_list
+                
         if return_components:
-            return res1, res2, Xi2, Xi3, Xi4, Xip, P
+            return res1s, res2, Xi2s, Xi3s, Xi4s, Xips, Ps
         else:
-            return res1, res2, Xi2, Xi3, Xi4, Xip
+            return res1s, res2, Xi2s, Xi3s, Xi4s, Xips
 
     def get_freqs_only(self,  **kwargs):
         res = self.get_normal_mode_frame(**kwargs)

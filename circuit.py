@@ -10,7 +10,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.linalg as sl
 import numpy.linalg as nl
-from scipy.optimize import minimize, least_squares
+from scipy.optimize import minimize, least_squares, fsolve
+from scipy.interpolate import splrep, sproot, splev
 from scipy.misc import derivative, factorial
 import sympy as sp
 from sympy.parsing.sympy_parser import parse_expr
@@ -225,13 +226,30 @@ class Circuit(object):
             anyLs = self.anyTs
             
         parameters = self.find_parameters(kwargs)
-        def anyL(p, P=np.identity(self.dim)):
+        
+        def _anyL(p, P=np.identity(self.dim)):
             p=P.dot(p)
             return anyLs[which](*p, *parameters)
+        
+        def anyL(p, P=np.identity(self.dim)):
+            if not isinstance(p, np.ndarray):
+                raise TypeError('p argument should be a numpy.ndarray')
+            else:
+                if p.ndim>1:
+                    shape = p.shape
+                    true_shape = shape[:-1]
+                    items_anyL = []
+                    reshaped_p = np.reshape(p, (np.array(true_shape).prod(), shape[-1])) # assume p vector is in last axis (may be changed)
+                    for item_p in reshaped_p:
+                        items_anyL.append(_anyL(item_p, P=P))
+                    items_anyL = np.reshape(np.array(items_anyL), true_shape)
+                    return items_anyL
+                else:     
+                    return _anyL(p, P=P)
         return anyL
         
     def get_HessnL(self, UorT, n, **kwargs):
-        def HessnL(p, P=np.identity(self.dim)):
+        def _HessnL(p, P=np.identity(self.dim)):
 #            p = P.dot(p)   
             _HessnL= []
             for which in which_list(n, self.dim):
@@ -247,6 +265,24 @@ class Circuit(object):
 #            _Hess4U3 = np.transpose(np.dot(np.transpose(_Hess4U2,(2,1,0,3)), P),(2,1,0,3))
 #            _Hess4U4 = np.transpose(np.dot(np.transpose(_Hess4U3,(3,1,2,0)), P),(3,1,2,0))
             return _HessnL
+        
+        def HessnL(p, P=np.identity(self.dim)):
+            if not isinstance(p, np.ndarray):
+                raise TypeError('p argument should be a numpy.ndarray')
+            else:
+                if p.ndim>1:
+                    shape = p.shape
+                    true_shape = shape[:-1]
+                    items_HessnL = []
+                    reshaped_p = np.reshape(p, (np.array(true_shape).prod(), shape[-1])) # assume p vector is in last axis (may be changed)
+                    for item_p in reshaped_p:
+                        items_HessnL.append(_HessnL(item_p, P=P))
+                    shape_Hess = items_HessnL[-1].shape
+                    items_HessnL = np.reshape(np.array(items_HessnL), true_shape+shape_Hess)
+                    return items_HessnL
+                else:     
+                    return _HessnL(p, P=P)
+
         return HessnL
 
 
@@ -271,23 +307,151 @@ class Circuit(object):
             return res.x, Hess
         else:
             raise Exception
-    
-    def get_U_matrix(self, mode = 'analytical', **kwargs):
-
+            
+    def get_U_matrix(self, mode = 'analytical', search = 'numerical', **kwargs):
+        search='analytical'
         U = self.get_any_precomp_L('U', (0,)*self.dim, **kwargs)
 #        print(U([1,2]))
         if mode == 'analytical':
-            x0 = np.zeros(self.dim)
+            if search=='analytical':
+                def display_f(p):
+                    which = np.eye(self.dim, dtype=int)
+                    product_deriv = self.get_any_precomp_L('U', tuple(which[0]), **kwargs)(p)
+                    for w in which[1:]:
+                        product_deriv += self.get_any_precomp_L('U', tuple(w), **kwargs)(p)
+                    return product_deriv
+                def derivative(p):
+                    which = np.eye(self.dim, dtype=int)
+                    deriv = []
+                    for w in which:
+                        deriv.append(self.get_any_precomp_L('U', tuple(w), **kwargs)(p))
+                    return deriv
+                
+                def pos_2nd_derivative(p):
+                    which = np.eye(self.dim, dtype=int)*2
+                    is_it = True
+                    for w in which:
+                        is_it = (self.get_any_precomp_L('U', tuple(w), **kwargs)(p)>0) and is_it
+                    return is_it
+                
+                bound = 3*pi
+                N = 21
+                phi_test_opt = np.linspace(-bound, bound, N)
+                phi_test_zero = np.zeros(N)
+                phi_test = np.concatenate((np.array([phi_test_zero]), np.array([phi_test_opt]))).T
+                
+                pot = derivative(phi_test)[1]
+
+                spline = splrep(phi_test_opt, pot)
+                def interpol(x):
+                    return splev(x, spline)
+
+                phi_interpol = np.linspace(-bound, bound, 10*N)
+                
+                roots = np.array(sproot(spline))
+
+                is_it = []
+                for root in roots:
+                    sgn = pos_2nd_derivative(np.array([0,root]))
+                    is_it.append(sgn)
+                min_roots = roots[np.array(is_it)]
+                if len(min_roots)>1 and False:
+                    fig0, ax0 = plt.subplots()
+#                    ax0.plot(phi_test_opt, derivative(phi_test)[1], '.')
+#                    ax0.plot(phi_interpol, interpol(phi_interpol))
+#                    ax0.plot(roots, interpol(roots), 'o') 
+#                    ax0.plot(min_roots, interpol(min_roots), 'o')   
+                    phi_plot = np.concatenate((np.array([np.zeros(N*10)]), np.array([phi_interpol]))).T    
+                    
+                    U_roots = U(np.concatenate((np.array([np.zeros(len(roots))]), np.array([roots]))).T)
+                    U_min_roots = U(np.concatenate((np.array([np.zeros(len(min_roots))]), np.array([min_roots]))).T)
+                    ax0.plot(phi_plot, U(phi_plot))
+                    ax0.plot(roots, U_roots, 'o') 
+                    ax0.plot(min_roots, U_min_roots, 'o')
+
+                
+#                Ntest = 101
+#                phi_test1b = np.linspace(-3*3*pi, 3*3*pi, Ntest)
+#                phi_test1a = np.linspace(0, 0, Ntest)
+#                grid1 = np.moveaxis(np.meshgrid(phi_test1a, phi_test1b),0,-1)
+#                U_pcolor1 = U(grid1)
+#                
+#                phi_test2b = np.linspace(0, 0, Ntest)
+#                phi_test2a = np.linspace(-2, 2, Ntest)
+#                grid2 = np.moveaxis(np.meshgrid(phi_test2a, phi_test2b),0,-1)
+#                U_pcolor2 = U(grid2)
+#                
+#                phi_test3b = np.linspace(-10*pi, 10*pi, Ntest)
+#                phi_test3a = np.linspace(-2, 2, Ntest)
+#                grid3 = np.moveaxis(np.meshgrid(phi_test3a, phi_test3b),0,-1)
+#                U_pcolor3 = U(grid3)
+#                
+#                roots = fsolve(f, [1 for ii in range(self.dim)])
+#                print(roots)
+#                
+#                f_pcolor = np.abs(display_f(grid3))
+#                fig, ax = plt.subplots(3,2)
+#                ax[0, 0].pcolor(phi_test3a, phi_test3b, U_pcolor1)
+#                ax[1, 0].pcolor(phi_test3a, phi_test3b, U_pcolor2)
+#                ax[2, 0].pcolor(phi_test3a, phi_test3b, U_pcolor3)
+#                                
+#                ax[2, 1].pcolor(phi_test3a, phi_test3b, f_pcolor)
+                x0 = np.zeros(self.dim)
+                x0 = np.dstack((np.zeros(len(min_roots)), np.array(min_roots)))[0]
+                pot_x0 = U(x0)
+                pot_x0, x0 = zip(*sorted(zip(pot_x0, x0)))
+                x0 = np.array(x0)
+#                print(type(x0), type(x0[0]))
+#                x0 = np.array([0,min_roots[0]])
+#                print(x0)
+            if search=='global':
+                Ntest = 101
+                phi_test = np.linspace(-10*pi, 10*pi, Ntest)
+                grid = np.meshgrid(*([phi_test]*self.dim))
+                grid = np.moveaxis(grid,0,-1)
+                grid = np.reshape(grid, (Ntest**self.dim,self.dim))
+                U_min = U(grid[0])
+                ii_min = 0
+                for ii in range(1,len(grid)):
+                    if U(grid[ii]) < U_min:
+                        U_min = U(grid[ii])
+                        ii_min = ii
+                ii_0 = np.unravel_index(ii_min, tuple([Ntest]*self.dim))
+                x0 = [phi_test[i] for i in ii_0]
+                print('Global minimum approximate location')
+                print(ii_0)
+            if search=='numerical':
+                x0 = np.zeros(self.dim)
             def U1(x):
                 return U(x)/1e14
-            res = minimize(U1, x0, method='SLSQP', tol=1e-12)#, bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
+            x1 = np.zeros(self.dim)
+#            x0 = np.zeros(self.dim)
+            res = minimize(U1, x1, method='SLSQP', tol=1e-12)#, bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
             HessU = self.get_HessnL('U', 2, **kwargs)
-            quad = res.x, HessU(res.x)/2
-#            print(quad)
-#            print(res.x)
+#            quad = res.x, HessU(res.x)/2
+            quad = x0, HessU(x0)/2
+#            print(x0)
+
         else:
             quad = self.get_quadratic_form(U) # not suported anymore
         return quad
+    
+#    def get_U_matrix(self, mode = 'analytical', **kwargs):
+#
+#        U = self.get_any_precomp_L('U', (0,)*self.dim, **kwargs)
+##        print(U([1,2]))
+#        if mode == 'analytical':
+#            x0 = np.zeros(self.dim)
+#            def U1(x):
+#                return U(x)/1e14
+#            res = minimize(U1, x0, method='SLSQP', tol=1e-12)#, bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
+#            HessU = self.get_HessnL('U', 2, **kwargs)
+#            quad = res.x, HessU(res.x)/2
+##            print(quad)
+##            print(res.x)
+#        else:
+#            quad = self.get_quadratic_form(U) # not suported anymore
+#        return quad
     
     def get_T_matrix(self, mode = 'analytical', **kwargs):
 
@@ -362,32 +526,38 @@ class Circuit(object):
         return fs
 
     def get_normal_mode_frame(self, **kwargs):
-        res1, U0 = self.get_U_matrix(mode = 'analytical', **kwargs)
+        res1s, U0s = self.get_U_matrix(mode = 'analytical', **kwargs)
         res2, T0 = self.get_T_matrix(mode = 'analytical', **kwargs)
         
-        w0, v0 = nl.eigh(T0)
-#        w0, v0 = self.reorder(*(nl.eigh(T0)), 0, debug=False)
-        sqrtw = sl.sqrtm(np.diag(w0))
-
-        U1 = np.dot(np.dot(nl.inv(v0), U0), v0)
-        U2 = np.dot(np.dot(nl.inv(sqrtw), U1), nl.inv(sqrtw))
-        w2, v2 = nl.eigh(U2)
         
-#        w2, v2 = self.reorder(w2, v2, 2, debug=False)
+        Ps = []
+        w2s = []
+        for U0 in U0s:
+            w0, v0 = nl.eigh(T0)
+    #        w0, v0 = self.reorder(*(nl.eigh(T0)), 0, debug=False)
+            sqrtw = sl.sqrtm(np.diag(w0))
+    
+            U1 = np.dot(np.dot(nl.inv(v0), U0), v0)
+            U2 = np.dot(np.dot(nl.inv(sqrtw), U1), nl.inv(sqrtw))
+            w2, v2 = nl.eigh(U2)
+            
+    #        w2, v2 = self.reorder(w2, v2, 2, debug=False)
+    
+    
+            P = np.dot(np.dot(v0, nl.inv(sqrtw)), v2)
+    #        print(w0)
+            
+            w2, P = self.reorder(w2, P, 2)
+    
+            invP = np.dot(np.dot(nl.inv(v2), nl.inv(sqrtw)), nl.inv(v0))
+    
+            pseudo_invP = np.dot(np.dot(nl.inv(v2), np.diag(w0**0.5)), nl.inv(v0))
+            
+            wU3 = np.diag(np.dot(np.dot(invP, U0), P))
+            Ps.append(P)
+            w2s.append(w2)
 
-
-        P = np.dot(np.dot(v0, nl.inv(sqrtw)), v2)
-#        print(w0)
-        
-        w2, P = self.reorder(w2, P, 2)
-
-        invP = np.dot(np.dot(nl.inv(v2), nl.inv(sqrtw)), nl.inv(v0))
-
-        pseudo_invP = np.dot(np.dot(nl.inv(v2), np.diag(w0**0.5)), nl.inv(v0))
-        
-        wU3 = np.diag(np.dot(np.dot(invP, U0), P))
-
-        return res1, res2, P, w2
+        return res1s, res2, np.array(Ps), np.array(w2s)
     
     def reorder(self, values, vectors, either0_or2, debug=False):
         dim = len(values)

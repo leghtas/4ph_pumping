@@ -17,6 +17,7 @@ import matplotlib
 from matplotlib.animation import FuncAnimation
 import sys
 
+
 e = circuit.e
 
 def move_figure(f, x, y):
@@ -40,7 +41,8 @@ wa, Za = [5e9*2*np.pi, 120]
 
 Cc = 2.8*1e-15
 
-LJ, alpha, n = [12000e-12/3, 1/1, 3] #dLJ, linear part of inductance for sna
+LJ, alpha, n = [12000e-12/3, 1/2.2, 3]
+#LJ, alpha, n = [12000e-12/3, 1/3, 3] #dLJ, linear part of inductance for sna
 w = 10.0e9*2*pi
 
 
@@ -94,40 +96,91 @@ if 1==0:
 
 # Get freqs and Kerrs v.s. flux
 if 1==1:
-    n_modes = 2
-    Xi2 = np.zeros((n_modes, len(phiVec)))
-    Xi3 = np.zeros((n_modes, len(phiVec)))
-    Xi4 = np.zeros((n_modes, len(phiVec)))
-    check_Xi2 = np.zeros((n_modes, len(phiVec)))
-    Xi_a2s = np.zeros(len(phiVec))
-    Xi_a2s2 = np.zeros(len(phiVec))
-    resx = np.zeros(len(phiVec))
-    resy = np.zeros(len(phiVec))
-    comp = np.zeros((n_modes, n_modes, len(phiVec)))
-    for kk, xx in enumerate(phiVec):
-        _res  = c.get_freqs_kerrs(particulars=[(0,0,1), (0,0,1,1)], return_components=True, phi_ext_0=xx)
-        res1, res2, Xi2s, Xi3s, Xi4s, Xi_p, P= _res
-        Xi2[:, kk] = Xi2s
-        Xi3[:, kk] = Xi3s
-        Xi4[:, kk] = 2*Xi4s
-        Xi_a2s[kk] = Xi_p[0]
-#        print(Xi_p[1])
-        Xi_a2s2[kk] = 4*Xi_p[1]
-        resx[kk] = res1[0]
-        resy[kk] = res1[1]
-        comp[:, :, kk] = (P.T) 
+    n_modes = c.dim
+    max_solutions = 3
+    particulars = [(0,0,1), (0,0,1,1)]
+    factors_particulars = np.array([1, 4])
+        
+    Xi2 = np.zeros((len(phiVec), max_solutions, n_modes))
+    Xi3 = np.zeros((len(phiVec), max_solutions, n_modes))
+    Xi4 = np.zeros((len(phiVec), max_solutions, n_modes))
+    
 
+    n_particulars = len(particulars)
+    Xip = np.zeros((len(phiVec), max_solutions, n_particulars))
+
+    comp = np.zeros((len(phiVec), max_solutions, n_modes, n_modes))
+    for kk, xx in enumerate(phiVec):
+        _res  = c.get_freqs_kerrs(particulars=particulars, return_components=True, max_solutions=max_solutions, phi_ext_0=xx)
+        res1, res2, Xi2s, Xi3s, Xi4s, Xips, P= _res
+        Xi2[kk] = Xi2s
+        Xi3[kk] = Xi3s
+        Xi4[kk] = 2*Xi4s
+        Xip[kk] = Xips
+        comp[kk] = np.moveaxis(P, 1, -1)
+        
+    Xi2 = np.moveaxis(Xi2, -1, 0)
+    Xi3 = np.moveaxis(Xi3, -1, 0)
+    Xi4 = np.moveaxis(Xi4, -1, 0)
+    Xip = np.moveaxis(Xip*factors_particulars, -1, 0)
 
 # PLOT
 if 1==1:
+    colors = ['b', 'r', 'y', 'g', 'o']
     fig0, ax0 = plt.subplots(figsize=(12,6))
-    ax0.plot(phiVec/2/pi, Xi2[0,:]/1e9, '.', label= 'f0')    
-    ax0.plot(phiVec/2/pi, Xi2[1,:]/1e9, '.', label= 'f1')
+    for ii, f in enumerate(Xi2):
+        ax0.plot(phiVec/2/pi, f/1e9, '.', label= 'f'+str(ii), color = colors[ii])
 #    ax0.plot(phiVec/2/pi, Xi2[2,:]/1e9, '.', label= 'f2')
 #    ax0.plot(phiVec/2/pi, Xi2[3,:]/1e9, '.', label= 'f3')
     ax0.legend()
     ax0.set_ylabel('GHz')
     index = np.argmin(np.abs(Xi2[1,:]-Xi2[0,:]-1e9))
+    
+    fig, ax = plt.subplots(n_modes, 3, figsize=(16,8), sharex=True)
+    display_factor = 2
+    for ii in range(n_modes):
+        ax[ii, 0].plot(phiVec/2/pi, Xi2[ii]/1e9, '.', label= 'f'+str(ii))
+        ax[ii, 0].legend()
+        ax[ii, 0].set_ylabel('GHz')
+        
+        ax[ii, 1].plot(phiVec/2/pi, Xi3[ii]/1e6)
+        ax[ii, 1].set_ylabel('MHz')
+        mean = np.nanmean(Xi3[ii]/1e6)
+        std = np.nanmean(Xi3[ii]/1e6)
+        ax[ii, 1].set_ylim(mean-display_factor*std, mean+display_factor*std)
+        
+        ax[ii, 2].plot(phiVec/2/pi, Xi4[ii]/1e6)   
+        ax[ii, 2].set_ylabel('MHz')
+        mean = np.nanmean(Xi4[ii]/1e6)
+        std = np.nanmean(Xi4[ii]/1e6)
+        ax[ii, 2].set_ylim(mean-display_factor*std, mean+display_factor*std)
+        
+    ax[0,0].set_title('$a^{+}a$')
+    ax[0,1].set_title('$a^{+}a^2$')
+    ax[0,2].set_title('$a^{+2}a^2/2$')
+    
+    
+
+    dphiVec = (phiVec[1:]+phiVec[:-1])/2
+    figp, axp = plt.subplots(n_particulars,2, figsize=(16,8), sharex=True)
+    display_factor = 2
+    for ii in range(n_particulars):
+        axp[ii, 0].plot(phiVec/2/pi, Xip[ii]/1e6, '.', label= str(particulars[ii]))
+        axp[ii, 0].legend()
+        axp[ii, 0].set_ylabel('MHz')
+        mean = np.nanmean(Xip[ii]/1e6)
+        std = np.nanmean(Xip[ii]/1e6)
+        axp[ii, 0].set_ylim(mean-display_factor*std, mean+display_factor*std)
+        
+        dXip=np.diff(Xip[ii], axis=0)/(phiVec[1]-phiVec[0])*pi/10
+        axp[ii, 1].plot(dphiVec/2/pi, dXip/1e6, '.', label= str(particulars[ii]))
+        axp[ii, 1].legend()
+        axp[ii, 1].set_ylabel('MHz')
+        mean = np.nanmean(dXip/1e6)
+        std = np.nanmean(dXip/1e6)
+        axp[ii, 1].set_ylim(mean-display_factor*std, mean+display_factor*std)
+        
+            
 
     
 #    fig00, ax00 = plt.subplots(2,2,figsize=(12,6))
