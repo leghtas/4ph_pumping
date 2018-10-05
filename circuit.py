@@ -10,9 +10,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.linalg as sl
 import numpy.linalg as nl
-from scipy.optimize import minimize, least_squares
-import numdifftools as nd
-from scipy.misc import derivative
+from scipy.optimize import minimize, least_squares, fsolve
+from scipy.interpolate import splrep, sproot, splev
+from scipy.misc import derivative, factorial
 import sympy as sp
 from sympy.parsing.sympy_parser import parse_expr
 
@@ -118,6 +118,25 @@ def tuple_list(n):
         _tuple_list.append(tuple(temp_list))
     return _tuple_list
 
+def get_factor(which):
+    factor = 1
+    for elt in set(which):
+        factor = factor*factorial(which.count(elt))
+    return factor
+
+def permute(to_add, old=[]):
+    new = []
+    for _to_add in to_add:
+        new_list = old+[_to_add]
+        new_to_add = to_add.copy()
+        new_to_add.remove(_to_add)
+        if len(new_to_add)>=1:
+            permuted = permute(new_to_add, new_list)
+            for perm in permuted:
+                new.append(perm)
+        else:
+            new.append(new_list)
+    return new
 
 class Circuit(object):
 
@@ -132,6 +151,9 @@ class Circuit(object):
         self.prepare_T_formal()
         self.store_anyL('U', self.max_order)
         self.store_anyL('T', self.max_order)
+        self.to_compare_0 = None
+        self.to_compare_2 = None
+        self.permutations = None
         
     def remove_params(self, symbol_list):
         variables = []
@@ -172,7 +194,7 @@ class Circuit(object):
         T_expr_sub = T_expr.subs(self.__dict__)
         self.T_formal = T_expr_sub
     
-    def get_anyL(self, UorT, which): # which should be a tuple with derivativative wanted (0,0) for the first one
+    def get_anyL(self, UorT, which): # which should be a tuple with derivativative wanted (1,0,0) for the first one
         
         if UorT=='U':
             L_expr = self.U_formal
@@ -204,13 +226,30 @@ class Circuit(object):
             anyLs = self.anyTs
             
         parameters = self.find_parameters(kwargs)
-        def anyL(p, P=np.identity(self.dim)):
+        
+        def _anyL(p, P=np.identity(self.dim)):
             p=P.dot(p)
             return anyLs[which](*p, *parameters)
+        
+        def anyL(p, P=np.identity(self.dim)):
+            if not isinstance(p, np.ndarray):
+                raise TypeError('p argument should be a numpy.ndarray')
+            else:
+                if p.ndim>1:
+                    shape = p.shape
+                    true_shape = shape[:-1]
+                    items_anyL = []
+                    reshaped_p = np.reshape(p, (np.array(true_shape).prod(), shape[-1])) # assume p vector is in last axis (may be changed)
+                    for item_p in reshaped_p:
+                        items_anyL.append(_anyL(item_p, P=P))
+                    items_anyL = np.reshape(np.array(items_anyL), true_shape)
+                    return items_anyL
+                else:     
+                    return _anyL(p, P=P)
         return anyL
         
     def get_HessnL(self, UorT, n, **kwargs):
-        def HessnL(p, P=np.identity(self.dim)):
+        def _HessnL(p, P=np.identity(self.dim)):
 #            p = P.dot(p)   
             _HessnL= []
             for which in which_list(n, self.dim):
@@ -226,11 +265,29 @@ class Circuit(object):
 #            _Hess4U3 = np.transpose(np.dot(np.transpose(_Hess4U2,(2,1,0,3)), P),(2,1,0,3))
 #            _Hess4U4 = np.transpose(np.dot(np.transpose(_Hess4U3,(3,1,2,0)), P),(3,1,2,0))
             return _HessnL
+        
+        def HessnL(p, P=np.identity(self.dim)):
+            if not isinstance(p, np.ndarray):
+                raise TypeError('p argument should be a numpy.ndarray')
+            else:
+                if p.ndim>1:
+                    shape = p.shape
+                    true_shape = shape[:-1]
+                    items_HessnL = []
+                    reshaped_p = np.reshape(p, (np.array(true_shape).prod(), shape[-1])) # assume p vector is in last axis (may be changed)
+                    for item_p in reshaped_p:
+                        items_HessnL.append(_HessnL(item_p, P=P))
+                    shape_Hess = items_HessnL[-1].shape
+                    items_HessnL = np.reshape(np.array(items_HessnL), true_shape+shape_Hess)
+                    return items_HessnL
+                else:     
+                    return _HessnL(p, P=P)
+
         return HessnL
 
 
     def get_quadratic_form(self, A, brute=False):
-        x0 = np.array([0, 0])
+        x0 = np.zeros(self.dim)
         res = minimize(A, x0, method='SLSQP', tol=1e-12)
         if res.success:
             if brute is True:
@@ -250,13 +307,104 @@ class Circuit(object):
             return res.x, Hess
         else:
             raise Exception
-    
-    def get_U_matrix(self, mode = 'analytical', globalsearch = True, **kwargs):
-
+            
+    def get_U_matrix(self, mode = 'analytical', search = 'numerical', **kwargs):
+        search='numerical'
         U = self.get_any_precomp_L('U', (0,)*self.dim, **kwargs)
 #        print(U([1,2]))
         if mode == 'analytical':
-            if globalsearch is True:
+            if search=='analytical':
+                def display_f(p):
+                    which = np.eye(self.dim, dtype=int)
+                    product_deriv = self.get_any_precomp_L('U', tuple(which[0]), **kwargs)(p)
+                    for w in which[1:]:
+                        product_deriv += self.get_any_precomp_L('U', tuple(w), **kwargs)(p)
+                    return product_deriv
+                def derivative(p):
+                    which = np.eye(self.dim, dtype=int)
+                    deriv = []
+                    for w in which:
+                        deriv.append(self.get_any_precomp_L('U', tuple(w), **kwargs)(p))
+                    return deriv
+                
+                def pos_2nd_derivative(p):
+                    which = np.eye(self.dim, dtype=int)*2
+                    is_it = True
+                    for w in which:
+                        is_it = (self.get_any_precomp_L('U', tuple(w), **kwargs)(p)>0) and is_it
+                    return is_it
+                
+                bound = 3*pi
+                N = 21
+                phi_test_opt = np.linspace(-bound, bound, N)
+                phi_test_zero = np.zeros(N)
+                phi_test = np.concatenate((np.array([phi_test_zero]), np.array([phi_test_opt]))).T
+                
+                pot = derivative(phi_test)[1]
+
+                spline = splrep(phi_test_opt, pot)
+                def interpol(x):
+                    return splev(x, spline)
+
+                phi_interpol = np.linspace(-bound, bound, 10*N)
+                
+                roots = np.array(sproot(spline))
+
+                is_it = []
+                for root in roots:
+                    sgn = pos_2nd_derivative(np.array([0,root]))
+                    is_it.append(sgn)
+                min_roots = roots[np.array(is_it)]
+                if len(min_roots)>1 and False:
+                    fig0, ax0 = plt.subplots()
+#                    ax0.plot(phi_test_opt, derivative(phi_test)[1], '.')
+#                    ax0.plot(phi_interpol, interpol(phi_interpol))
+#                    ax0.plot(roots, interpol(roots), 'o') 
+#                    ax0.plot(min_roots, interpol(min_roots), 'o')   
+                    phi_plot = np.concatenate((np.array([np.zeros(N*10)]), np.array([phi_interpol]))).T    
+                    
+                    U_roots = U(np.concatenate((np.array([np.zeros(len(roots))]), np.array([roots]))).T)
+                    U_min_roots = U(np.concatenate((np.array([np.zeros(len(min_roots))]), np.array([min_roots]))).T)
+                    ax0.plot(phi_plot, U(phi_plot))
+                    ax0.plot(roots, U_roots, 'o') 
+                    ax0.plot(min_roots, U_min_roots, 'o')
+
+                
+#                Ntest = 101
+#                phi_test1b = np.linspace(-3*3*pi, 3*3*pi, Ntest)
+#                phi_test1a = np.linspace(0, 0, Ntest)
+#                grid1 = np.moveaxis(np.meshgrid(phi_test1a, phi_test1b),0,-1)
+#                U_pcolor1 = U(grid1)
+#                
+#                phi_test2b = np.linspace(0, 0, Ntest)
+#                phi_test2a = np.linspace(-2, 2, Ntest)
+#                grid2 = np.moveaxis(np.meshgrid(phi_test2a, phi_test2b),0,-1)
+#                U_pcolor2 = U(grid2)
+#                
+#                phi_test3b = np.linspace(-10*pi, 10*pi, Ntest)
+#                phi_test3a = np.linspace(-2, 2, Ntest)
+#                grid3 = np.moveaxis(np.meshgrid(phi_test3a, phi_test3b),0,-1)
+#                U_pcolor3 = U(grid3)
+#                
+#                roots = fsolve(f, [1 for ii in range(self.dim)])
+#                print(roots)
+#                
+#                f_pcolor = np.abs(display_f(grid3))
+#                fig, ax = plt.subplots(3,2)
+#                ax[0, 0].pcolor(phi_test3a, phi_test3b, U_pcolor1)
+#                ax[1, 0].pcolor(phi_test3a, phi_test3b, U_pcolor2)
+#                ax[2, 0].pcolor(phi_test3a, phi_test3b, U_pcolor3)
+#                                
+#                ax[2, 1].pcolor(phi_test3a, phi_test3b, f_pcolor)
+                x0 = np.zeros(self.dim)
+                x0 = np.dstack((np.zeros(len(min_roots)), np.array(min_roots)))[0]
+                pot_x0 = U(x0)
+                pot_x0, x0 = zip(*sorted(zip(pot_x0, x0)))
+                x0 = np.array(x0)
+#                print(type(x0), type(x0[0]))
+#                x0 = np.array([0,min_roots[0]])
+#                print(x0)
+            if search=='global':
                 Ntest = 101
                 phi_test = np.linspace(-10*pi, 10*pi, Ntest)
                 grid = np.meshgrid(*([phi_test]*self.dim))
@@ -272,35 +420,56 @@ class Circuit(object):
                 x0 = [phi_test[i] for i in ii_0]
                 print('Global minimum approximate location')
                 print(ii_0)
-            else:
+            if search=='numerical':
                 x0 = np.zeros(self.dim)
-            def U1(x):
-                return U(x)/1e14
-            res = minimize(U1, x0, method='SLSQP', tol=1e-12)#, bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
+                def U1(x):
+                    return U(x)/1e14
+                res = minimize(U1, x0, method='SLSQP', tol=1e-12)#, bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
+                x0 = np.array([res.x])
+
             HessU = self.get_HessnL('U', 2, **kwargs)
-            quad = res.x, HessU(res.x)/2
-    #            print(quad)
-    #            print(res.x)
+            quad = x0, HessU(x0)/2
+#            print(x0)
+
         else:
             quad = self.get_quadratic_form(U) # not suported anymore
         return quad
+    
+#    def get_U_matrix(self, mode = 'analytical', **kwargs):
+#
+#        U = self.get_any_precomp_L('U', (0,)*self.dim, **kwargs)
+##        print(U([1,2]))
+#        if mode == 'analytical':
+#            x0 = np.zeros(self.dim)
+#            def U1(x):
+#                return U(x)/1e14
+#            res = minimize(U1, x0, method='SLSQP', tol=1e-12)#, bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
+#            HessU = self.get_HessnL('U', 2, **kwargs)
+#            quad = res.x, HessU(res.x)/2
+##            print(quad)
+##            print(res.x)
+#        else:
+#            quad = self.get_quadratic_form(U) # not suported anymore
+#        return quad
     
     def get_T_matrix(self, mode = 'analytical', **kwargs):
 
         T = self.get_any_precomp_L('T', (0,)*self.dim, **kwargs)
 #        print(T([1,2]))
         if mode == 'analytical':
-            res = np.array([0, 0])
+            res = np.zeros(self.dim)
             HessT = self.get_HessnL('T', 2, **kwargs)
             quad = res, HessT(res)/2
         else:
             quad = self.get_quadratic_form(T)
         return quad
 
-    def get_freqs_kerrs(self, **kwargs):
+    def get_freqs_kerrs(self, particular=None, return_components=False, **kwargs):
 
         res = self.get_normal_mode_frame(**kwargs)
         res1, res2, P, w2 = res
+        
+
         fs = np.sqrt(w2)/2/np.pi
 
         # calculate Kerrs from polynomial approximation of potential
@@ -309,24 +478,45 @@ class Circuit(object):
         Hess3U = self.get_HessnL('U', 3,  **kwargs)
         Hess4U = self.get_HessnL('U', 4,  **kwargs)
 
-        Hess2_r = Hess2U([res1[0], res1[1]], P=P)
-        Hess3_r = Hess3U([res1[0], res1[1]], P=P)
-        Hess4_r = Hess4U([res1[0], res1[1]], P=P)
+        Hess2_r = Hess2U(res1, P=P)
+        Hess3_r = Hess3U(res1, P=P)
+        Hess4_r = Hess4U(res1, P=P)
+
+  
 
         popt2 = np.array([Hess2_r[0, 0]/2, Hess2_r[1, 1]/2])
         popt3 = np.array([Hess3_r[0, 0, 0]/6, Hess3_r[1, 1, 1]/6]) # coeff devant le phi**3
         popt4 = np.array([Hess4_r[0, 0, 0, 0]/24, Hess4_r[1, 1, 1, 1]/24]) # coeff devant le phi**4
-
-
-        ZPF = popt2**(-1./4)
-
-        Xi2 = popt2*(ZPF**2)/2/np.pi # freq en Hz
-        Xi3 = 2 * popt3*(ZPF**3)/2/np.pi #coeff devant a^2.a^+
+        
+        ZPF = popt2**(-1./4)/4**0.5 # hbar*w/2 is the term in front of a^+.a in the hamiltonian coming from phi**2, the other half is from dphi**2 
+        
+        if particular is not None:
+            factor, power = get_factor(particular)
+            if len(particular)==2:
+                Hessp_r = Hess2_r
+                poptp = Hessp_r[particular[0], particular[1]]/factor
+                Xip = poptp*(ZPF[particular[0]]*ZPF[particular[0]])/2/np.pi
+            elif len(particular)==3:
+                Hessp_r = Hess3_r       
+                poptp = Hessp_r[particular[0], particular[1], particular[2]]/factor
+                Xip = poptp*(ZPF[particular[0]]*ZPF[particular[1]]*ZPF[particular[2]])/2/np.pi
+            elif len(particular)==4:
+                Hessp_r = Hess4_r 
+                poptp = Hessp_r[particular[0], particular[1], particular[2], particular[3]]/factor
+                Xip = poptp*(ZPF[particular[0]]*ZPF[particular[1]]*ZPF[particular[2]]*ZPF[particular[3]])/2/np.pi
+        else:
+            Xip = None
+            
+        # factor 4 see former remark so in front of phi**2 we got w/4 (one 2 come from developping (a^+ + a)**2, the other from the kinetic part)
+        Xi2 = 4 * popt2*(ZPF**2)/2/np.pi # freq en Hz : coeff devant a^+.a (*2 to get whole freq)
+        Xi3 = 3 * popt3*(ZPF**3)/2/np.pi #coeff devant a^2.a^+
         Xi4 = 6 * popt4*(ZPF**4)/2/np.pi #coeff devant a^2.a^+2
 
-        check_Xi2 = w2**0.5/2/np.pi
-
-        return res1, res2, Xi2, Xi3, Xi4, check_Xi2
+#        check_Xi2 = w2**0.5/2/np.pi
+        if return_components:
+            return res1, res2, Xi2, Xi3, Xi4, Xip
+        else:
+            return res1, res2, Xi2, Xi3, Xi4, Xip, P
 
     def get_freqs_only(self,  **kwargs):
         res = self.get_normal_mode_frame(**kwargs)
@@ -335,20 +525,160 @@ class Circuit(object):
         return fs
 
     def get_normal_mode_frame(self, **kwargs):
-        res1, U0 = self.get_U_matrix(mode = 'analytical', **kwargs)
+        res1s, U0s = self.get_U_matrix(mode = 'analytical', **kwargs)
         res2, T0 = self.get_T_matrix(mode = 'analytical', **kwargs)
         
-        w0, v0 = nl.eigh(T0)
-        sqrtw = sl.sqrtm(np.diag(w0))
-
-        U1 = np.dot(np.dot(nl.inv(v0), U0), v0)
-        U2 = np.dot(np.dot(nl.inv(sqrtw), U1), nl.inv(sqrtw))
-        w2, v2 = nl.eigh(U2)
-        P = np.dot(np.dot(v0, nl.inv(sqrtw)), v2)
-        invP = np.dot(np.dot(nl.inv(v2), nl.inv(sqrtw)), nl.inv(v0))
-
-        pseudo_invP = np.dot(np.dot(nl.inv(v2), np.diag(w0**0.5)), nl.inv(v0))
         
-        wU3 = np.diag(np.dot(np.dot(invP, U0), P))
+        Ps = []
+        w2s = []
+        for U0 in U0s:
+            w0, v0 = nl.eigh(T0)
+    #        w0, v0 = self.reorder(*(nl.eigh(T0)), 0, debug=False)
+            sqrtw = sl.sqrtm(np.diag(w0))
+    
+            U1 = np.dot(np.dot(nl.inv(v0), U0), v0)
+            U2 = np.dot(np.dot(nl.inv(sqrtw), U1), nl.inv(sqrtw))
+            w2, v2 = nl.eigh(U2)
+            
+    #        w2, v2 = self.reorder(w2, v2, 2, debug=False)
+    
+    
+            P = np.dot(np.dot(v0, nl.inv(sqrtw)), v2)
+    #        print(w0)
+            
+            w2, P = self.reorder(w2, P, 2)
+    
+            invP = np.dot(np.dot(nl.inv(v2), nl.inv(sqrtw)), nl.inv(v0))
+    
+            pseudo_invP = np.dot(np.dot(nl.inv(v2), np.diag(w0**0.5)), nl.inv(v0))
+            
+            wU3 = np.diag(np.dot(np.dot(invP, U0), P))
+            Ps.append(P)
+            w2s.append(w2)
 
-        return res1, res2, P, wU3
+        return res1s, res2, np.array(Ps), np.array(w2s)
+    
+    def reorder(self, values, vectors, either0_or2, debug=False):
+        dim = len(values)
+        vectors = vectors.T
+        order = []
+        if either0_or2 ==2:
+#            print(vectors)
+            val, vec = nl.eigh(vectors.T)
+#            print('val propres 0 =' +str(val))
+        
+#        print(self.to_compare_0, self.to_compare_2)
+        
+        to_compares = [self.to_compare_0, self.to_compare_2]
+        jj = int(either0_or2/2)
+        if to_compares[jj] is None:
+            to_compare = np.eye(dim)
+            self.permutations = permute([ii for ii in range(dim)])
+        else:
+            to_compare = np.eye(dim)
+#            to_compare = to_compares[jj]
+            
+        distances = []
+        sgns = []
+        for ii, vector in enumerate(vectors):
+            if debug:
+                print('comparison')
+                print(np.dot(to_compare, vector))
+            dists, sgn = comp_dist(vector, to_compare)
+            distances.append(dists)
+            sgns.append(sgn)
+#            if either0_or2==2:
+#                print(dists)
+            index_max = np.argmin(dists)
+#            vectors[ii] = vector*sgn
+            order.append(index_max)
+        
+        best_sum_dist = np.inf
+        best_perm = None
+        for perm in self.permutations:
+            sum_dist = 0
+            for ii in perm:
+                sum_dist += distances[ii][perm[ii]]
+            if sum_dist<best_sum_dist:
+                best_perm = perm
+                best_sum_dist = sum_dist
+                
+        order=best_perm
+#        order=[0,1,2,3,4]
+        for ii in range(dim):
+            vectors[ii]=vectors[ii]*sgns[ii][order[ii]]
+#        if either0_or2==2:
+#            print(order)
+        
+#        print(order)
+        
+#        order_bis = [[] for i in range(dim)]
+#        for ii, vectorT in enumerate(vectors.T):
+#            order_bis[np.argmax(np.abs(np.dot(to_compare, vectorT)))].append(ii)
+#        print(order)
+#        print(order_bis)
+#        if to_compares[jj] is None:
+#            to_correct = None
+#            for ii in range(dim):
+#                if len(order_bis[ii])==2:
+#                    order_bis[ii].remove(order[ii])
+#                    to_correct = order_bis[ii][0]
+#                elif len(order_bis[ii])==3:
+#                    print('Houston we got a problem')
+#            if to_correct is not None:
+#                for ii in range(dim):
+#                    if len(order_bis[ii])==0:
+#                        order[ii]=to_correct
+    
+    #    order_temp = list(range(dim))
+    #    pb_index = None
+    #    
+    #    indices = [[] for i in range(dim)]
+    #    for ii, elt in enumerate(order):
+    #        indices[elt].append(ii)
+    #    
+    #    
+    #    for ii, elt in enumerate(order):
+    #        if ii==0:
+    #            order_temp.remove(elt)
+    #        else:
+    #            if elt not in order[:ii]:
+    #                order_temp.remove(elt)
+    #            else:
+    #                pb_index = ii
+    #                
+    #    if pb_index is not None:
+    #        order[ii]=order_temp[0]
+        
+        vectors_ordered = [0 for i in range(dim)]         
+        values_ordered = [0 for i in range(dim)]
+        
+        for ii in range(dim):
+            vectors_ordered[order[ii]] = vectors[ii]
+            values_ordered[order[ii]] = values[ii]
+        
+                
+        if to_compares[jj] is None:
+            if either0_or2==0:
+                self.to_compare_0 = np.array(vectors_ordered)
+            elif either0_or2==2:
+                self.to_compare_2 = np.array(vectors_ordered)
+        if debug:
+            print(order)
+            print(vectors)
+            print(vectors_ordered)
+            
+        vectors_ordered = np.array(vectors_ordered).T 
+        values_ordered = np.array(values_ordered)
+    #    print(order)
+        return values_ordered, vectors_ordered
+    
+def comp_dist(a, b):
+    ret=[]
+    sgn=[]
+    for ii in b:
+        dists = np.array([(((a-ii)**2).sum())**0.5, (((a+ii)**2).sum())**0.5])
+        argmin = np.argmin(dists)
+        ret.append(dists[argmin])
+        sgn.append(argmin*(-2)+1)
+    return np.array(ret), np.array(sgn)
