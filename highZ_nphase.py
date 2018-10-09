@@ -40,16 +40,27 @@ def move_figure(f, x, y):
         # You can also use window.setGeometry
         f.canvas.manager.window.move(x, y)
     plt.show()
+    
+def organize(Xi):
+    X_new = np.zeros((siz[0],siz[1]))
+    for ii in range(siz[1]):
+        X = [Xi[i][ii] for i in range(siz[0])]
+        for kk in range(siz[0]):
+            index = np.argmin(X)
+            X_new[kk][ii] = X[index]
+            del X[index]
+    return X_new
+
 
 pi = np.pi
 plt.close('all')
 
 
-wa, Za = [13e9*2*np.pi, 50]
+wa, Za = [20e9*2*np.pi, 120]
 
-#Cc = 2.8*1e-15
+#Cc = 2.8*1e-15!
 
-LJ, n = [500e-12, 4]
+LJ, n = [500e-12, 10]
 LS, alpha = [1500e-12, 1/2]
 
 _, _, EJ = circuit.get_E_from_w(1, 1, LJ) #dLJ should be 0 to compute non-linearities !!!!!
@@ -130,13 +141,17 @@ if 1==1:
     Xi3 = np.moveaxis(Xi3, -1, 0)
     Xi4 = np.moveaxis(Xi4, -1, 0)
     Xip = np.moveaxis(Xip*factors_particulars, -1, 0)
+    Xi2 = organize(Xi2)
+    Xi3 = organize(Xi3)
+    Xi4 = organize(Xi4)
+    Xip = organize(Xip)
 
 # PLOT
 if 1==1:
     colors = ['b', 'r', 'y', 'g', 'o']
     fig0, ax0 = plt.subplots(figsize=(12,6))
     for ii, f in enumerate(Xi2):
-        ax0.plot(phiVec/2/pi, f/1e9, '.', label= 'f'+str(ii), color = colors[ii])
+        ax0.plot(phiVec/2/pi, f/1e9, '.', label= 'f'+str(ii)) #, color = colors[ii])
 #    ax0.plot(phiVec/2/pi, Xi2[2,:]/1e9, '.', label= 'f2')
 #    ax0.plot(phiVec/2/pi, Xi2[3,:]/1e9, '.', label= 'f3')
     ax0.legend()

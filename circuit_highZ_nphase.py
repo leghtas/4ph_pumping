@@ -70,17 +70,17 @@ class CircuitTunableReso(c.Circuit):
 #        self.phi_ext_0 = 0
 #        self.varying_params={'ECca':0}
         
-        self.U_str = 'ELa/2/hbar*pa**2'
+        self.U_str = 'ELa/2/hbar*pa**2 -(ES/hbar)*cos(ps) -alpha*(ES/hbar)*cos(phi_ext_0-ps)'
         for i in range(self.n):
             self.U_str += '- (EJ/hbar)*cos(p'+str(i)+')'
                  
-        self.T_str = '(1/16.)*(hbar/ECa)*(dpa'
+        self.T_str = '(1/16.)*(hbar/ECa)*(dps-dpa'
         for i in range(self.n):
-            self.T_str += '+ dp'+str(i)
+            self.T_str += '- dp'+str(i)
         self.T_str += ')**2'
         for i in range(self.n):
             self.T_str += '+(1/16)*(hbar/ECj)*(dp'+str(i)+')**2'
-
+        self.T_str += '+ (1/16.)*(hbar/ECs)*(dps)**2'
                 
 
         if printParams:
@@ -96,6 +96,7 @@ class CircuitTunableReso(c.Circuit):
             print("Leq = "+str(Leq*1e9)+" nH")
             print("Ceq = "+str(Ceq*1e15)+" fF")
             print("feq = "+str(weq/2/pi*1e-9)+"GHz")
+            print("Zeq = "+str(np.sqrt(Leq/Ceq))+"Ohm")
             print("-------------")
             print("LJ = "+str(LJ*1e9)+" nH")
             print("CJ = "+str(CJ*1e15)+" fF")

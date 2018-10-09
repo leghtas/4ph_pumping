@@ -51,7 +51,7 @@ class CircuitTunableReso(c.Circuit):
         self.ECj = e**2/2/CJ
         self.ECs = e**2/2/CS/(1+alpha) # accounting for the two parasitic capa
         
-        Leq = La + n*LJ # + LS/(1+alpha)
+        Leq = La + n*LJ + LS/(1+alpha)
         Ceq = 1/(1/Ca) # + n/CJ) # + 1/CS/(1+alpha) 
         weq = 1/np.sqrt(Leq*Ceq)
         #_, _, Eeq = c.get_E_from_w(1, 1, Leq) 
@@ -63,13 +63,14 @@ class CircuitTunableReso(c.Circuit):
 #        self.varying_params={'ECca':0}
         
         self.U_str = 'ELa/2/hbar*pa**2 \
-                      - n*(EJ/hbar)*cos(pj)'
-#                      - (ES/hbar)*cos(ps) \
-#                      - alpha*(ES/hbar)*cos(phi_ext_0-ps)'
+                      - n*(EJ/hbar)*cos(pj) \
+                      - (ES/hbar)*cos(ps) \
+                      - alpha*(ES/hbar)*cos(phi_ext_0-ps)'
 #                      - EJ/hbar*cos(ps)+0*phi_ext_0'
                  
-        self.T_str = '(1/16.)*(hbar/ECa)*(dpa+n*dpj)**2 \
-                      + n*(1/16.)*(hbar/ECj)*(dpj)**2'
+        self.T_str = '(1/16.)*(hbar/ECa)*(dps-dpa-n*dpj)**2 \
+                      + n*(1/16.)*(hbar/ECj)*(dpj)**2 \
+                      + (1/16.)*(hbar/ECs)*(dps)**2'
 #                      + (1/16.)*(hbar/ECs)*(dps)'
                 
 
@@ -86,6 +87,7 @@ class CircuitTunableReso(c.Circuit):
             print("Leq = "+str(Leq*1e9)+" nH")
             print("Ceq = "+str(Ceq*1e15)+" fF")
             print("feq = "+str(weq/2/pi*1e-9)+"GHz")
+            print("Zeq = "+str(np.sqrt(Leq/Ceq))+"Ohm")
             print("-------------")
             print("LJ = "+str(LJ*1e9)+" nH")
             print("CJ = "+str(CJ*1e15)+" fF")

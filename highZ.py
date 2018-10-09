@@ -1,15 +1,17 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon May 30 15:11:49 2016
+Created on Mon Oct  8 17:21:26 2018
 
-@author: leghtas
+@author: Vil
 """
 
 import scipy.constants as sc
 import numpy as np
 import matplotlib.pyplot as plt
 import circuit
-import circuit_highZ_1phase as ctr
+import circuit_highZ_1phase as ctr_1
+import circuit_highZ_nphase as ctr_n
 import scipy.linalg as sl
 import numpy.linalg as nl
 from scipy.misc import factorial
@@ -39,7 +41,7 @@ plt.close('all')
 
 wa, Za = [20e9*2*np.pi, 120]
 
-#Cc = 2.8*1e-15
+#Cc = 2.8*1e-15!
 
 LJ, n = [500e-12, 10]
 LS, alpha = [1000e-12, 1/2]
@@ -49,12 +51,14 @@ _, _, ES = circuit.get_E_from_w(1, 1, LS)
 
 #EJ, LJ, I0 = circuit.convert_EJ_LJ_I0(I0=I0)
 
-
-c = ctr.CircuitTunableReso(wa, Za, EJ, alpha, n, ES) 
+print('Same phase for each junction')
+c_1 = ctr_1.CircuitTunableReso(wa, Za, EJ, alpha, n, ES)
+print('\n Different phase for each junction')
+c_n = ctr_n.CircuitTunableReso(wa, Za, EJ, alpha, n, ES) 
 
 min_phi = 0*2*pi
 max_phi = 1*2*pi
-Npts = 1001
+Npts = 11
 phiVec = np.linspace(min_phi, max_phi, Npts)
 ng_sweep = np.linspace(-1, 1, 21)
 
@@ -64,38 +68,10 @@ Npts = 101
 CcaVec = np.linspace(min_Cca, max_Cca, Npts)
 ECcaVec = e**2/2/CcaVec
 
-
-#Plot potential
-if 1==0:
-    fig, ax = plt.subplots(figsize = (12,12))
-    ax.set_xlabel(r'$\varphi_r$', fontsize = fs)
-    ax.set_ylabel(r'$\varphi_s$', fontsize = fs)
-    min_i = 0
-    max_i = 10
-    def update(i):
-        Phi_ext = np.linspace(0,2*np.pi, max_i-min_i)
-        phi_ext= Phi_ext[i]
-        U = c.get_U(phi_ext_0=phi_ext)
-        shape=(40,20)
-        Ps = np.linspace(-8*np.pi, 8*np.pi, shape[0])
-        Pr = np.linspace(-8*np.pi, 8*np.pi, shape[1])
-
-        U_color = np.empty(shape)
-        for ii, ps in enumerate(Ps):
-            for jj, pr in enumerate(Pr):
-                U_color[ii, jj] = U(np.array([ps, pr]))
-
-        ax.pcolor(Pr, Ps, U_color, vmin=vmin, vmax=vmax)
-        return ax
-#        move_figure(fig, -1900, 10)
-
-    anim = FuncAnimation(fig, update, frames=np.arange(min_i, max_i), interval=200)
-#    if len(sys.argv) > 1 and sys.argv[1] == 'save':
-    anim.save('line.html', dpi=80, writer='imagemagick')
-
 # Get freqs and Kerrs v.s. flux
 if 1==1:
-    n_modes = c.dim
+    n_modes = c_1.dim
+    nn_modes = c_n.dim
     max_solutions = 1
     particulars = [(0,0,1), (0,0,1,1)]
     factors_particulars = np.array([1, 4])
@@ -103,56 +79,91 @@ if 1==1:
     Xi2 = np.zeros((len(phiVec), max_solutions, n_modes))
     Xi3 = np.zeros((len(phiVec), max_solutions, n_modes))
     Xi4 = np.zeros((len(phiVec), max_solutions, n_modes))
-    
+    Xi2_n = np.zeros((len(phiVec), max_solutions, nn_modes))
+    Xi3_n = np.zeros((len(phiVec), max_solutions, nn_modes))
+    Xi4_n = np.zeros((len(phiVec), max_solutions, nn_modes))
 
     n_particulars = len(particulars)
     Xip = np.zeros((len(phiVec), max_solutions, n_particulars))
-
-    comp = np.zeros((len(phiVec), max_solutions, n_modes, n_modes))
+    Xip_n = np.zeros((len(phiVec), max_solutions, n_particulars))
+    
+#    comp = np.zeros((len(phiVec), max_solutions, n_modes, n_modes))
     for kk, xx in enumerate(phiVec):
-        _res  = c.get_freqs_kerrs(particulars=particulars, return_components=True, max_solutions=max_solutions, phi_ext_0=xx)
+        _res  = c_1.get_freqs_kerrs(particulars=particulars, return_components=True,\
+                                  max_solutions=max_solutions, phi_ext_0=xx)
         res1, res2, Xi2s, Xi3s, Xi4s, Xips, P= _res
         Xi2[kk] = Xi2s
         Xi3[kk] = Xi3s
         Xi4[kk] = 2*Xi4s
         Xip[kk] = Xips
-        comp[kk] = np.moveaxis(P, 1, -1)
+        
+        _res  = c_n.get_freqs_kerrs(particulars=particulars, return_components=True,\
+                                  max_solutions=max_solutions, phi_ext_0=xx)
+        res1, res2, Xi2s, Xi3s, Xi4s, Xips, P= _res
+        Xi2_n[kk] = Xi2s
+        Xi3_n[kk] = Xi3s
+        Xi4_n[kk] = 2*Xi4s
+        Xip_n[kk] = Xips
+#        comp[kk] = np.moveaxis(P, 1, -1)
         
     Xi2 = np.moveaxis(Xi2, -1, 0)
     Xi3 = np.moveaxis(Xi3, -1, 0)
     Xi4 = np.moveaxis(Xi4, -1, 0)
     Xip = np.moveaxis(Xip*factors_particulars, -1, 0)
+    Xi2_n = np.moveaxis(Xi2_n, -1, 0)
+    Xi3_n = np.moveaxis(Xi3_n, -1, 0)
+    Xi4_n = np.moveaxis(Xi4_n, -1, 0)
+    Xip_n = np.moveaxis(Xip_n*factors_particulars, -1, 0)
 
 # PLOT
 if 1==1:
-    colors = ['b', 'r', 'y', 'g', 'o']
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
     fig0, ax0 = plt.subplots(figsize=(12,6))
     for ii, f in enumerate(Xi2):
-        ax0.plot(phiVec/2/pi, f/1e9, '.', label= 'f'+str(ii), color = colors[ii])
+        ax0.plot(phiVec/2/pi, f/1e9, 'o', label= 'f'+str(ii), color = colors[ii])
+    for ii, f in enumerate(Xi2_n):
+        ax0.plot(phiVec/2/pi, f/1e9, '*', label= 'f'+str(ii)+' n modes', color = colors[ii])
 #    ax0.plot(phiVec/2/pi, Xi2[2,:]/1e9, '.', label= 'f2')
 #    ax0.plot(phiVec/2/pi, Xi2[3,:]/1e9, '.', label= 'f3')
     ax0.legend()
     ax0.set_ylabel('GHz')
     index = np.argmin(np.abs(Xi2[1,:]-Xi2[0,:]-1e9))
     
-    fig, ax = plt.subplots(n_modes, 3, figsize=(16,8), sharex=True)
+    fig, ax = plt.subplots(2, 3, figsize=(16,8), sharex=True)
     display_factor = 2
     for ii in range(n_modes):
-        ax[ii, 0].plot(phiVec/2/pi, Xi2[ii]/1e9, '.', label= 'f'+str(ii))
-        ax[ii, 0].legend()
-        ax[ii, 0].set_ylabel('GHz')
-        
-        ax[ii, 1].plot(phiVec/2/pi, Xi3[ii]/1e6)
-        ax[ii, 1].set_ylabel('MHz')
-        mean = np.nanmean(Xi3[ii]/1e6)
-        std = np.nanmean(Xi3[ii]/1e6)
-        ax[ii, 1].set_ylim(mean-display_factor*std, mean+display_factor*std)
-        
-        ax[ii, 2].plot(phiVec/2/pi, Xi4[ii]/1e6)   
-        ax[ii, 2].set_ylabel('MHz')
-        mean = np.nanmean(Xi4[ii]/1e6)
-        std = np.nanmean(Xi4[ii]/1e6)
-        ax[ii, 2].set_ylim(mean-display_factor*std, mean+display_factor*std)
+        if max(Xi2[ii])<1e10:
+            ax[0, 0].plot(phiVec/2/pi, Xi2[ii]/1e9, '.', label= 'f'+str(ii))
+            ax[0, 0].legend()
+            ax[0, 0].set_ylabel('GHz')
+            
+            ax[0, 1].plot(phiVec/2/pi, Xi3[ii]/1e6)
+            ax[0, 1].set_ylabel('MHz')
+            mean = np.nanmean(Xi3[ii]/1e6)
+            std = np.nanmean(Xi3[ii]/1e6)
+            ax[0, 1].set_ylim(mean-display_factor*std, mean+display_factor*std)
+            
+            ax[0, 2].plot(phiVec/2/pi, Xi4[ii]/1e6)   
+            ax[0, 2].set_ylabel('MHz')
+            mean = np.nanmean(Xi4[ii]/1e6)
+            std = np.nanmean(Xi4[ii]/1e6)
+            ax[0, 2].set_ylim(mean-display_factor*std, mean+display_factor*std)
+        else:
+            ax[1, 0].plot(phiVec/2/pi, Xi2[ii]/1e9, '.', label= 'f'+str(ii))
+            ax[1, 0].legend()
+            ax[1, 0].set_ylabel('GHz')
+            
+            ax[1, 1].plot(phiVec/2/pi, Xi3[ii]/1e6)
+            ax[1, 1].set_ylabel('MHz')
+            mean = np.nanmean(Xi3[ii]/1e6)
+            std = np.nanmean(Xi3[ii]/1e6)
+            ax[1, 1].set_ylim(mean-display_factor*std, mean+display_factor*std)
+            
+            ax[1, 2].plot(phiVec/2/pi, Xi4[ii]/1e6)   
+            ax[1, 2].set_ylabel('MHz')
+            mean = np.nanmean(Xi4[ii]/1e6)
+            std = np.nanmean(Xi4[ii]/1e6)
+            ax[1, 2].set_ylim(mean-display_factor*std, mean+display_factor*std)
         
     ax[0,0].set_title('$a^{+}a$')
     ax[0,1].set_title('$a^{+}a^2$')
