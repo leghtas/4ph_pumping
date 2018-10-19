@@ -259,6 +259,7 @@ class Circuit(object):
             
             permutations = tuple_list(n)
             for permutation in permutations:
+#                print(P.shape, _HessnL.shape)
                 _HessnL = np.transpose(np.dot(np.transpose(_HessnL, permutation), P), permutation)
 #            _Hess4U1 = np.transpose(np.dot(np.transpose(_Hess4U,(0,1,2,3)), P),(0,1,2,3))
 #            _Hess4U2 = np.transpose(np.dot(np.transpose(_Hess4U1,(1,0,2,3)), P),(1,0,2,3))
@@ -309,7 +310,7 @@ class Circuit(object):
             raise Exception
             
     def get_U_matrix(self, mode = 'analytical', search = 'numerical', **kwargs):
-        search='analytical'
+        search='numerical'
         U = self.get_any_precomp_L('U', (0,)*self.dim, **kwargs)
 #        print(U([1,2]))
         if mode == 'analytical':
@@ -422,15 +423,12 @@ class Circuit(object):
                 print(ii_0)
             if search=='numerical':
                 x0 = np.zeros(self.dim)
-            def U1(x):
-                return U(x)/1e14
-            x1 = np.zeros(self.dim)
-#            x0 = np.zeros(self.dim)
-            res = minimize(U1, x1, method='SLSQP', tol=1e-12)#, bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
+                def U1(x):
+                    return U(x)/1e14
+                res = minimize(U1, x0, method='SLSQP', tol=1e-12)#, bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
+                x0 = np.array([res.x])
             HessU = self.get_HessnL('U', 2, **kwargs)
-#            quad = res.x, HessU(res.x)/2
             quad = x0, HessU(x0)/2
-#            print(x0)
 
         else:
             quad = self.get_quadratic_form(U) # not suported anymore
