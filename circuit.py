@@ -226,7 +226,6 @@ class Circuit(object):
             anyLs = self.anyTs
             
         parameters = self.find_parameters(kwargs)
-        
         def _anyL(p, P=np.identity(self.dim)):
             p=P.dot(p)
             return anyLs[which](*p, *parameters)
@@ -463,9 +462,9 @@ class Circuit(object):
             quad = self.get_quadratic_form(T)
         return quad
 
-    def get_freqs_kerrs(self, particular=None, return_components=False, **kwargs):
+    def get_freqs_kerrs(self, particular=None, return_components=False, sort=True, **kwargs):
 
-        res = self.get_normal_mode_frame(**kwargs)
+        res = self.get_normal_mode_frame(sort=sort, **kwargs)
         res1, res2, P, w2 = res
         
 
@@ -517,13 +516,13 @@ class Circuit(object):
         else:
             return res1, res2, Xi2, Xi3, Xi4, Xip, P
 
-    def get_freqs_only(self,  **kwargs):
-        res = self.get_normal_mode_frame(**kwargs)
+    def get_freqs_only(self, sort=True, **kwargs):
+        res = self.get_normal_mode_frame(sort=sort,**kwargs)
         res1, res2, P, w2 = res
         fs = np.sqrt(w2)/2/np.pi
         return fs
 
-    def get_normal_mode_frame(self, **kwargs):
+    def get_normal_mode_frame(self, sort=True, **kwargs):
         res1s, U0s = self.get_U_matrix(mode = 'analytical', **kwargs)
         res2, T0 = self.get_T_matrix(mode = 'analytical', **kwargs)
         
@@ -544,8 +543,8 @@ class Circuit(object):
     
             P = np.dot(np.dot(v0, nl.inv(sqrtw)), v2)
     #        print(w0)
-            
-            w2, P = self.reorder(w2, P, 2)
+            if sort:
+                w2, P = self.reorder(w2, P, 2)
     
             invP = np.dot(np.dot(nl.inv(v2), nl.inv(sqrtw)), nl.inv(v0))
     
@@ -681,3 +680,40 @@ def comp_dist(a, b):
         ret.append(dists[argmin])
         sgn.append(argmin*(-2)+1)
     return np.array(ret), np.array(sgn)
+
+
+def pcolor_z(ax, *args, alpha=None, norm=None, cmap=None, vmin=None, vmax=None, data=None, **kwargs):
+    ax.pcolor(*args, alpha=None, norm=None, cmap=cmap, vmin=vmin, vmax=vmax, data=data, **kwargs)
+    if len(args)==3:
+        x_axis, y_axis, z_data = args
+    elif len(args)==1:
+        z_data, = args
+        shape_data = z_data.shape
+        x_axis, y_axis = np.arange(shape_data[1]), np.arange(shape_data[0])
+    else:
+        raise ValueError('Should have x, y, z or z args')
+    def format_coord(x, y):
+        dx = (x_axis[1]-x_axis[0])
+        dy = (y_axis[1]-y_axis[0])
+        col = np.argmin(np.abs(x_axis-x+dx/2))
+        row = np.argmin(np.abs(y_axis-y+dy/2))
+        numrows, numcols = np.shape(z_data)
+        if col >= 0 and col < numcols and row >= 0 and row < numrows:
+            z = z_data[row, col]
+            return 'x=%1.4f, y=%1.4f, z=%1.4f' % (x, y, z)
+        else:
+            return 'x=%1.4f, y=%1.4f' % (x, y)
+    ax.format_coord = format_coord
+    
+def to_pcolor(x, y):
+    if len(x)>1:       
+        xf = 2*x[-1]-x[-2]
+    else:
+        xf = x[0]+1
+    if len(y)>1:
+        yf = 2*y[-1]-y[-2]
+    else:
+        yf = y[0]+1
+    x = np.append(x, xf)
+    y = np.append(y, yf)
+    return (x, y)
