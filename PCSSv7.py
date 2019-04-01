@@ -52,8 +52,8 @@ c = cHJPC.CircuitPump2Snail(wa, Za, wb, Zb, Ls, LJ, L,)
 
 max_freq_displayed = 15# GHz
 
-min_phi = -1*2*pi
-max_phi = 2*2*pi
+min_phi = 0*2*pi
+max_phi = 1*2*pi
 Npts = 51
 phi_Delta = np.linspace(min_phi, max_phi, Npts)
 phi_Sum = np.linspace(min_phi, max_phi, Npts)

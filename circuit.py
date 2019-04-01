@@ -178,6 +178,7 @@ class Circuit(object):
         print('U = '+str(U_expr))
         U_expr_symbols = get_symbol_list(U_expr)
         self.U_variables = self.remove_params(U_expr_symbols)
+        print('Detected U variables : '+str(self.U_variables))
         self.dim = len(self.U_variables)
 
         U_expr_sub = U_expr.subs(self.__dict__)
@@ -189,6 +190,7 @@ class Circuit(object):
         print('T = '+str(T_expr))
         T_expr_symbols = get_symbol_list(T_expr)
         self.T_variables = self.remove_params(T_expr_symbols)
+        print('Detected T variables : '+str(self.T_variables))
         self.dim = len(self.T_variables)
 
         T_expr_sub = T_expr.subs(self.__dict__)
@@ -309,7 +311,7 @@ class Circuit(object):
             raise Exception
             
     def get_U_matrix(self, mode = 'analytical', search = 'numerical', **kwargs):
-        search='numerical'
+        search='global'
         U = self.get_any_precomp_L('U', (0,)*self.dim, **kwargs)
 #        print(U([1,2]))
         if mode == 'analytical':
@@ -406,24 +408,29 @@ class Circuit(object):
 #                print(x0)
             if search=='global':
                 Ntest = 101
-                phi_test = np.linspace(-10*pi, 10*pi, Ntest)
-                grid = np.meshgrid(*([phi_test]*self.dim))
+                phi_test = np.linspace(-2*pi, 2*pi, Ntest)
+                #TODO reput former line
+#                grid = np.meshgrid(*([phi_test]*self.dim))
+                grid = np.meshgrid(phi_test, [0])
                 grid = np.moveaxis(grid,0,-1)
-                grid = np.reshape(grid, (Ntest**self.dim,self.dim))
+#                grid = np.reshape(grid, (Ntest**self.dim,self.dim))
+                grid = np.reshape(grid, (Ntest,self.dim))
                 U_min = U(grid[0])
                 ii_min = 0
                 for ii in range(1,len(grid)):
                     if U(grid[ii]) < U_min:
                         U_min = U(grid[ii])
                         ii_min = ii
-                ii_0 = np.unravel_index(ii_min, tuple([Ntest]*self.dim))
-                x0 = [phi_test[i] for i in ii_0]
+#                ii_0 = np.unravel_index(ii_min, tuple([Ntest]*self.dim))
+                ii_0 = np.unravel_index(ii_min, tuple([Ntest,1]))
+                x0 = np.array([[phi_test[i] for i in ii_0]])
                 print('Global minimum approximate location')
                 print(ii_0)
             if search=='numerical':
                 x0 = np.zeros(self.dim)
                 def U1(x):
                     return U(x)/1e14
+#                print(U1(np.array([0,0])))
                 res = minimize(U1, x0, method='SLSQP', tol=1e-12)#, bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
                 x0 = np.array([res.x])
             HessU = self.get_HessnL('U', 2, **kwargs)
@@ -533,7 +540,6 @@ class Circuit(object):
             w0, v0 = nl.eigh(T0)
     #        w0, v0 = self.reorder(*(nl.eigh(T0)), 0, debug=False)
             sqrtw = sl.sqrtm(np.diag(w0))
-    
             U1 = np.dot(np.dot(nl.inv(v0), U0), v0)
             U2 = np.dot(np.dot(nl.inv(sqrtw), U1), nl.inv(sqrtw))
             w2, v2 = nl.eigh(U2)

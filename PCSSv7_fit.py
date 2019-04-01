@@ -9,7 +9,7 @@ import scipy.constants as sc
 import numpy as np
 import matplotlib.pyplot as plt
 import circuit as cc
-import circuit_half_JPC as cHJPC
+import circuit_PCSSv7 as cPCSSv7
 import scipy.linalg as sl
 import numpy.linalg as nl
 from scipy.misc import factorial
@@ -38,17 +38,57 @@ def move_figure(f, x, y):
 pi = np.pi
 plt.close('all')
 
+I2 = np.load('I2_1.npy')
+I1 = np.load('I1_1.npy')
+freq = np.load('freq_1.npy')
 
-wa, Za = [11e9*2*np.pi, 90]
-wb, Zb = [4e9*2*np.pi, 90]
+freq = np.where(freq>4, freq, np.nan)
+freq = np.where(freq<8, freq, np.nan)
 
-Cc = 3.7*1e-15
+def connex_data(array, tol):
+    shape = array.shape
+    ret_array = np.ones(shape)*np.nan
+    for jj in range(shape[0]):
+        for ii in range(shape[1]):
+            if array[jj, ii] is not np.nan:
+                at_least = 0
+                at_max = 0
+                if ii>0:
+                    at_max += 1
+                    if not np.isnan(array[jj, ii-1]):
+                        at_least+= 1
+                if jj>0:
+                    at_max += 1
+                    if not np.isnan(array[jj-1, ii]) and jj>0:
+                        at_least+= 1
+                if ii<shape[1]-1:
+                    at_max += 1
+                    if not np.isnan(array[jj, ii+1]):
+                        at_least+= 1
+                if jj<shape[0]-1:
+                    at_max += 1
+                    if not np.isnan(array[jj+1, ii]):
+                        at_least+= 1
+                if (at_max-at_least)<4-tol:
+                    ret_array[jj, ii] = array[jj, ii]
+    return ret_array
 
-LJ = 10e-9 #Henri
-L = 3e-9
-Ls = 0.01e-9
+    
 
-c = cHJPC.CircuitPump2Snail(wa, Za, wb, Zb, Ls, LJ, L,)
+fig, ax = plt.subplots(2,2, figsize= (8, 6))
+cc.pcolor_z(ax[0, 0], I1, I2, freq)
+filtered_freq = connex_data(freq, 2)
+filtered_freq = connex_data(filtered_freq, 1)
+cc.pcolor_z(ax[1, 0], I1, I2, filtered_freq)
+
+freq = filtered_freq
+
+
+wb, Zb = [4e9*2*np.pi, 50]
+LJ = 3e-9 #Henri
+L = 6e-9
+
+c = cPCSSv7.CircuitPump2Snail(wb, Zb, LJ, L,)
 
 max_freq_displayed = 15# GHz
 
@@ -59,54 +99,20 @@ phi_Delta = np.linspace(min_phi, max_phi, Npts)
 phi_Sum = np.linspace(min_phi, max_phi, Npts)
 ng_sweep = np.linspace(-1, 1, 21)
 
-min_Cca = 1e-15
-max_Cca = 100000e-15
-Npts = 101
-CcaVec = np.linspace(min_Cca, max_Cca, Npts)
-ECcaVec = e**2/2/CcaVec
-
-
-#Plot potential
-if 1==0:
-    fig, ax = plt.subplots(figsize = (12,12))
-    ax.set_xlabel(r'$\varphi_r$', fontsize = fs)
-    ax.set_ylabel(r'$\varphi_s$', fontsize = fs)
-    min_i = 0
-    max_i = 10
-    def update(i):
-        Phi_ext = np.linspace(0,2*np.pi, max_i-min_i)
-        phi_ext= Phi_ext[i]
-        U = c.get_U(phi_ext_0=phi_ext)
-        shape=(40,20)
-        Ps = np.linspace(-8*np.pi, 8*np.pi, shape[0])
-        Pr = np.linspace(-8*np.pi, 8*np.pi, shape[1])
-
-        U_color = np.empty(shape)
-        for ii, ps in enumerate(Ps):
-            for jj, pr in enumerate(Pr):
-                U_color[ii, jj] = U(np.array([ps, pr]))
-
-        ax.pcolor(Pr, Ps, U_color, vmin=vmin, vmax=vmax)
-        return ax
-#        move_figure(fig, -1900, 10)
-
-    anim = FuncAnimation(fig, update, frames=np.arange(min_i, max_i), interval=200)
-#    if len(sys.argv) > 1 and sys.argv[1] == 'save':
-    anim.save('line.html', dpi=80, writer='imagemagick')
-
 # Get freqs and Kerrs v.s. flux
 if 1==1:
     n_modes = c.dim
     print('Found %d modes...'%(n_modes))
     max_solutions = 1
-    particulars = [(0,0,0,1), (0,0,1,1)]
-    factors_particulars = np.array([1])
+    particulars = [(0,0)]#(0,0,0,1), (0,0,1,1)]
+    factors_particulars = np.array([])
         
     Xi2 = np.zeros((len(phi_Delta), len(phi_Sum), max_solutions, n_modes))
     Xi3 = np.zeros((len(phi_Delta), len(phi_Sum), max_solutions, n_modes))
     Xi4 = np.zeros((len(phi_Delta), len(phi_Sum), max_solutions, n_modes))
     
-
+    P0s = np.zeros((len(phi_Delta), len(phi_Sum)))
+    
     n_particulars = len(particulars)
     Xip = np.zeros((len(phi_Delta), len(phi_Sum), max_solutions, n_particulars))
 
@@ -115,6 +121,7 @@ if 1==1:
         for kk, xx in enumerate(phi_Sum):
             _res  = c.get_freqs_kerrs(particulars=particulars, return_components=True, max_solutions=max_solutions, sort=False, pext_1=(xx+yy)/2, pext_2=(xx-yy)/2)
             res1, res2, Xi2s, Xi3s, Xi4s, Xips, P= _res
+            P0s[ll, kk] = res1[0, 0]
             Xi2[ll, kk] = Xi2s
 #            Xi3[kk] = Xi3s
             Xi4[ll,kk] = 2*Xi4s
@@ -133,34 +140,21 @@ if 1==1:
 #    Xi2[3] = np.where(Xi2[3]<10e9, Xi2[3], Xi2[1])
     colors = ['b', 'r', 'y', 'g', 'o']
     fig0, ax0 = plt.subplots(2,figsize=(12,6))
-    figkerr, axkerr = plt.subplots(3,figsize=(12,6))
+#    figkerr, axkerr = plt.subplots(3,figsize=(12,6))
 #    figpumping, axpumping = plt.subplots(2, figsize=(12,6))
     
     
     f = Xi2[:,:,:,0]/1e9 #MHz
     kerr = Xi4[:,:,:,0]/1e6 #GHz
-    pumping = Xip[0,:,:,0]/1e6 #MHz
-    crosskerr = Xip[1,:,:,0]/1e6 #MHz
-    for ii in range(len(f)):
-        if ii<1:
-            cc.pcolor_z(ax0[ii], _phi_Sum/2/pi, _phi_Delta/2/pi, f[ii])#, '.', label= 'f'+str(ii), color = colors[ii])
-            ax0[ii].set_title('f%d'%(ii))
-            
-
-            if ii==0:
-                extremum = (np.nanvar(kerr[ii])**0.5)
-                print(extremum)
-            else:
-                extremum = (np.nanvar(kerr[ii])**0.5)*5
-            cc.pcolor_z(axkerr[ii], _phi_Sum/2/pi, _phi_Delta/2/pi, kerr[ii], vmin= -extremum, vmax = extremum, cmap='bwr')#, '.', label= 'f'+str(ii), color = colors[ii])
-            axkerr[ii].set_title('c4%d'%(ii))
-            
-    mean = np.nanmean(pumping)
-    extremum = (np.nanvar(pumping)**0.5)
-    print(extremum)        
-    cc.pcolor_z(axkerr[1], _phi_Sum/2/pi, _phi_Delta/2/pi, pumping, vmin= -extremum, vmax = extremum, cmap='bwr')
-    cc.pcolor_z(axkerr[2], _phi_Sum/2/pi, _phi_Delta/2/pi, crosskerr, vmin= -extremum, vmax = extremum, cmap='bwr')     
-#    ax0.plot(phiVec/2/pi, Xi2[2,:]/1e9, '.', label= 'f2')
+#    pumping = Xip[0,:,:,0]/1e6 #MHz
+#    crosskerr = Xip[1,:,:,0]/1e6 #MHz
+#    for ii in range(1):
+    cc.pcolor_z(ax0[0], _phi_Sum/2/pi, _phi_Delta/2/pi, f[0])#, '.', label= 'f'+str(ii), color = colors[ii])
+    ax0[0].set_title('f%d'%(0))
+    
+    cc.pcolor_z(ax0[1], _phi_Sum/2/pi, _phi_Delta/2/pi, P0s)#, '.', label= 'f'+str(ii), color = colors[ii])
+    ax0[1].set_title('Pos min')
+            #    ax0.plot(phiVec/2/pi, Xi2[2,:]/1e9, '.', label= 'f2')
 #    ax0.plot(phiVec/2/pi, Xi2[3,:]/1e9, '.', label= 'f3')
 #    ax0.legend()
 #    ax0.set_ylabel('GHz')
