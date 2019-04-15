@@ -14,11 +14,15 @@ import time as truetime
 
 def to_pcolor(x, y):
     xf = 2*x[-1]-x[-2]
-    yf = 2*y[-1]-y[-2]
     x = np.append(x, xf)
-    y = np.append(y, yf)
     x = x-(x[1]-x[0])/2
-    y = y-(y[1]-y[0])/2
+    if len(y)>1:
+        yf = 2*y[-1]-y[-2]
+        y = np.append(y, yf)
+        y = y-(y[1]-y[0])/2
+    else:
+        y = np.append(y, y[0]+1)
+        y = y-(y[1]-y[0])/2    
     return (x, y)
 
 
@@ -28,16 +32,16 @@ solve1mode = False
 solve2mode = True
 solve3mode = False
 
-alpha0 = 0*np.sqrt(1)*np.sqrt(2)*np.exp(1j*np.pi/2)
-alpha1 = np.sqrt(0.01)*np.exp(1j*np.pi/2)
+
 bIn = 1
-g2 = 2 * np.pi * 0.0
+g2 = 2 * np.pi * 5
 Kerr = 0
 Kerrb = 2*np.pi*0
 
-kappaa = 1. / 5*0
+kappaa = 1. / 100
 kappab = 2 * np.pi * 20
-kappaphi = 0 * 2 * np.pi * 0.1
+kappab_i = 2*np.pi*0.0
+kappaphi =  0* 2 * np.pi * 0.1
 
 kappa2 = 4*g2**2/kappab
 
@@ -47,7 +51,7 @@ nth = 0.1
 T1 = 15
 
 Na = 20
-Nb = 2
+Nb = 3
 a = qt.destroy(Na)
 aI = qt.tensor(a, qt.identity(Nb))
 b = qt.destroy(Nb)
@@ -55,49 +59,47 @@ Ib = qt.tensor(qt.identity(Na), b)
 
 H1 = -Kerr/2* a.dag()**2*a**2
 H1b = -Kerrb/2 * b.dag()**2*b**2
-#H2 = (qt.tensor(H1, qt.identity(Nb)) +
-#      g2*(qt.tensor((a**2-alpha0**2), b.dag()) +
-#          qt.tensor((a.dag()**2-alpha0.conjugate()**2), b))+
-#          qt.tensor(qt.identity(Na), H1b)
-#      )
-# No drive here
-H2 = (qt.tensor(H1, qt.identity(Nb)) +
-      g2*(qt.tensor(a**2, b.dag()) + qt.tensor(a.dag()**2, b))+
-      qt.tensor(qt.identity(Na), H1b)
-      )
 
-c_ops2 = [np.sqrt(kappaa)*qt.tensor(a, qt.identity(Nb)),
-          np.sqrt(kappab)*qt.tensor(qt.identity(Na), b),
-          np.sqrt(kappaphi)*qt.tensor(a.dag()*a, qt.identity(Nb))]
-
-dmax = 2 * kappab
-pmax = 0.1 * kappab
+dmax = 1 * kappab
+pmax = 0.0 * kappab
 #pmax = 300/40
 numd = 101
-nump = 3
+nump = 1
 delta_p_Vec = np.linspace(-pmax, pmax, nump)
 delta_d_Vec = np.linspace(-dmax, dmax, numd)
 at = np.zeros((len(delta_p_Vec), len(delta_d_Vec)), dtype=complex)
 bt = np.zeros((len(delta_p_Vec), len(delta_d_Vec)), dtype=complex)
 
-for jj, delta_d in enumerate(delta_d_Vec):
-    print('%s / %s' % (jj, len(delta_d_Vec)))
-    for kk, delta_p in enumerate(delta_p_Vec):
-        Hdet = (delta_p+delta_d)/2 * qt.tensor(a.dag()*a, qt.identity(Nb)) + \
-            delta_d * qt.tensor(qt.identity(Na), b.dag()*b) + \
-            np.sqrt(kappab)* bIn * qt.tensor(qt.identity(Na), b.dag() - b)/1j
-#        Hdet2 = delta_d * qt.tensor(a.dag()*a, qt.identity(Nb)) + \
-#            (2*delta_d-delta_p) * qt.tensor(qt.identity(Na), b.dag()*b) +\
-#            g2*alpha1**2 * qt.tensor((a.dag() + a), qt.identity(Nb))
-        try:
-            rho_ss = qt.steadystate(Hdet, c_ops2)# + H2
-        except Exception:
-            print(f'failed jj={jj},kk={kk}')
-        at[kk, jj] = qt.expect(aI.dag()*aI, rho_ss)
-        bt[kk, jj] = qt.expect(Ib, rho_ss)
+bins = np.logspace(-2,2,5)
+S21s = []
+for bIn in bins:
+    # No drive here
+    H2 = (0*qt.tensor(H1, qt.identity(Nb)) + 0*qt.tensor(qt.identity(Na), H1b) + 
+          g2*(qt.tensor(a**2, b.dag()) + qt.tensor(a.dag()**2, b)))
+    
+    c_ops2 = [np.sqrt(kappaa)*qt.tensor(a, qt.identity(Nb)),
+              np.sqrt(kappab+kappab_i)*qt.tensor(qt.identity(Na), b),
+              np.sqrt(kappaphi)*qt.tensor(a.dag()*a, qt.identity(Nb))]
+    
+    
+    for jj, delta_d in enumerate(delta_d_Vec):
+        print('%s / %s' % (jj+1, len(delta_d_Vec)))
+        for kk, delta_p in enumerate(delta_p_Vec):
+            Hdet = np.sqrt(kappab)* bIn * qt.tensor(qt.identity(Na), b.dag() - b)/1j + \
+                   delta_d * qt.tensor(qt.identity(Na), b.dag()*b) + \
+                   (delta_p+delta_d)/2 * qt.tensor(a.dag()*a, qt.identity(Nb))
+        
+            try:
+                rho_ss = qt.steadystate(Hdet + H2, c_ops2)# + H2
+            except Exception:
+                print(f'failed jj={jj},kk={kk}')
+            at[kk, jj] = qt.expect(aI.dag()*aI, rho_ss)
+            bt[kk, jj] = qt.expect(Ib, rho_ss)
+    
+    bOut = bt*np.sqrt(kappab)+bIn
+    S21 = bOut/bIn
+S21s=np.array(S21s)
 
-bOut = bt/np.sqrt(kappab)+bIn
-S21 = bOut/bIn
 #bt = bt + 1j*(g2/kappab)*alpha1**2
 
 fig, ax = plt.subplots(2,3)
@@ -117,6 +119,7 @@ ax[1,0].axis('tight')
 
 index_middle_pump = np.argmin(np.abs(delta_p_Vec))
 ax[0,1].plot(delta_d_Vec/2/np.pi, plt_abs[index_middle_pump])
+ax[0,1].set_ylim(top=1)
 ax[1,1].plot(delta_d_Vec/2/np.pi, plt_angle[index_middle_pump])
 
 plt_abs = np.abs(at)

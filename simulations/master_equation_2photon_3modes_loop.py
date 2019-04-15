@@ -16,16 +16,12 @@ plt.ion()
 
 solve1mode = True
 solve2mode = True
-solve3mode = False
+solve3mode = True
 
-params = [{'kappaao2pi' : 0.05, 'kappabo2pi' : 20, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 1 },
-          {'kappaao2pi' : 0.05, 'kappabo2pi' : 20, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 2 },
-          {'kappaao2pi' : 0.05, 'kappabo2pi' : 20, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 3 },
-          {'kappaao2pi' : 0.05, 'kappabo2pi' : 20, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 4 },
-          {'kappaao2pi' : 0.05, 'kappabo2pi' : 40, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 2 },
-          {'kappaao2pi' : 0.05, 'kappabo2pi' : 40, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 4 },
-          {'kappaao2pi' : 0.05, 'kappabo2pi' : 40, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 6 },
-          {'kappaao2pi' : 0.05, 'kappabo2pi' : 40, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 8 }
+params = [{'kappaao2pi' : 0.053, 'kappabo2pi' : 10, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 0.5 },
+          {'kappaao2pi' : 0.053, 'kappabo2pi' : 10, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 1 },
+          {'kappaao2pi' : 0.053, 'kappabo2pi' : 10, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 2 },
+          {'kappaao2pi' : 0.053, 'kappabo2pi' : 10, 'kappaphio2pi' : 0.05, 'Kerro2pi' : 0.05, 'g2o2pi' : 3 }
           ]
 
 for param in params:

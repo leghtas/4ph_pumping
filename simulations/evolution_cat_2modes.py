@@ -21,15 +21,15 @@ def to_pcolor(x, y):
     return (x, y)
 
 cdict = {'red':  ((0.0, 0.0, 0.0),
-                   (1/11, 1.0, 1.0),
+                   (0.5, 1.0, 1.0),
                    (1.0, 1.0, 1.0)),
 
          'green': ((0.0, 0.0, 0.0),
-                   (1/11, 1.0, 1.0),
+                   (0.5, 1.0, 1.0),
                    (1.0, 0.0, 0.0)),
 
          'blue':  ((0.0, 1.0, 1.0),
-                   (1/11, 1.0, 1.0),
+                   (0.5, 1.0, 1.0),
                    (1.0, 0.0, 0.0))
         }
 wigner_cm = LinearSegmentedColormap('my_cm', cdict)
@@ -43,17 +43,18 @@ solve2mode = True
 solve3mode = False
 
 alpha0 = np.sqrt(8)*np.exp(1j*np.pi/2)
-g2 = 2 * np.pi * 0.3
-Kerr = 2 * np.pi * 0.050*0
+g2 = 2 * np.pi * 1
+Kerr = 2 * np.pi * 0.05*0
 
-kappaa = 1. / 100.
+kappaa = 1. / 0.4*0
 kappab = 2 * np.pi * 20.
 chiab = 2*np.pi *0.1*0
 kappaphi = 0*kappaa/2 #1 * 2 * np.pi * 0.2
-drive = 1
+drive = 0
 
-delta_p = 2*np.pi*200*0
-delta_d = -delta_p
+delta_p = 2*np.pi*0
+#delta_d = -delta_p
+delta_d = 2*np.pi*0
 
 # 1 mode
 kappa2 = 4*g2**2/kappab  # 2*np.pi MHz
@@ -69,7 +70,7 @@ a = qt.destroy(Na)
 b = qt.destroy(Nb)
 
 
-
+#
 H1 = -Kerr * a.dag()**2*a**2 + drive*(a.dag()-a)/1j
 H2 = (qt.tensor(H1, qt.identity(Nb)) +
       g2*qt.tensor((a**2-alpha0**2), b.dag()) +
@@ -109,16 +110,41 @@ dx = xvec[1]-xvec[0]
 #ax0.pcolor(xvec, xvec, W3)
 #ax0.axis('equal')
 
-psi02 = qt.tensor(psi01, qt.basis(Nb, 0))
+#alpha0 = alpha0*np.exp(1j*np.pi/2)
+
+psi01_0 = qt.coherent(Na, alpha0)
+psi01_1 = qt.coherent(Na, -alpha0)
+psi01_plus = psi01_0+psi01_1
+psi01_minus = psi01_0-psi01_1
+
+psi02 = qt.tensor(psi01_1, qt.basis(Nb, 0))
 psi03 = qt.tensor(psi01, qt.basis(Nb, 0), qt.basis(2,1))
 rho03 = qt.tensor(psi01*psi01.dag(), qt.basis(Nb, 0)*qt.basis(Nb, 0).dag(),
                   qt.projection(2, 1, 1)*(1-nth)+qt.projection(2, 0, 0)*nth)
 
-if 1==0:
+e1 = 2*np.pi*0.8
+omega_drive = 2*np.pi*0.0
+
+
+H1_drive = (e1*a.dag()-np.conj(e1)*a)/1j
+H1_drive1 = qt.tensor(e1*a.dag()/1j,qt.identity(Nb))
+H1_drive2 = qt.tensor(-np.conj(e1)*a/1j,qt.identity(Nb))
+def H1_drive1_coeff(t, args):
+    return np.exp(1j*args['omega_drive']*t)
+def H1_drive2_coeff(t, args):
+    return np.exp(-1j*args['omega_drive']*t)
+
+
+parity_operator = (1j*np.pi*a.dag()*a).expm()
+
+if 1==1:
     #T = 5/kappa2
-    T = 200
-    dt = T/200.
+    T = 10
+    dt = T/100.
     tlist = np.linspace(0, T, T/dt+1)
+    fig, ax = plt.subplots()
+    ax.plot(tlist, np.real(H1_drive1_coeff(tlist, {'omega_drive': omega_drive})))
+    ax.set_title('drive')
     if solve1mode:
         result = qt.mesolve(H1, psi01, tlist, c_ops1, [])
         at = []
@@ -130,7 +156,11 @@ if 1==0:
             malphat.append(qt.expect(result.states[ii], ketmalpha0))
     if solve2mode:
         fock0 = qt.basis(Na, 0)
-        result2 = qt.mesolve(H2+H2det, psi02, tlist, c_ops2, [])
+        result2 = qt.mesolve([H2+0*H2det,[H1_drive1, H1_drive1_coeff], [H1_drive2, H1_drive2_coeff]], psi02, tlist, c_ops2, [],  args={'omega_drive': omega_drive})
+        energy_0 = qt.expect(H1_drive, ketalpha0)
+        energy_1 = qt.expect(H1_drive, ketmalpha0)
+        print('energy |0\ = %.3f'%energy_0)
+        print('energy |1\ = %.3f'%energy_1)
         pop0 = []
         at2 = []
         bt2 = []
@@ -139,6 +169,8 @@ if 1==0:
         popup = []
         popdown = []
         W2s = []
+        parity = []
+        nbara = []
         for ii, t in enumerate(tlist):
             at2.append(qt.expect(qt.tensor(a**2, qt.identity(Nb)),
                                  result2.states[ii]))
@@ -154,6 +186,8 @@ if 1==0:
             alphat2.append(qt.expect(rhoa, ketalpha0))
             malphat2.append(qt.expect(rhoa, ketmalpha0))
             pop0.append(qt.expect(rhoa, fock0))
+            parity.append(qt.expect(rhoa, parity_operator))
+            nbara.append(qt.expect(rhoa, a.dag()*a))
     if solve3mode:
         result3 = qt.mesolve(H3, rho03, tlist, c_ops3, [])
         at3 = []
@@ -203,14 +237,15 @@ if 1==0:
     ax2.set_ylabel('proj on alpha')
     ax2.legend()
     fig3, ax3 = plt.subplots(2,5, figsize=(12,6))
-    dt_disp = 10
-    T_disp = 100
+    T_disp = T
+    dt_disp = T_disp/10
+
     tdisplay = np.linspace(0,T_disp, T_disp/dt_disp+1)[:-1]
 
     for ii, tdisp in enumerate(tdisplay):
         index_T = np.argmin(np.abs(tlist-tdisp))
         
-        ax3[ii//5,ii%5].pcolor(xvec, xvec, np.pi/2*W2s[index_T], cmap=wigner_cm, vmin=-0.1, vmax=1)
+        ax3[ii//5,ii%5].pcolor(xvec, xvec, np.pi/2*W2s[index_T], cmap=wigner_cm, vmin=-1, vmax=1)
         ax3[ii//5,ii%5].set_aspect('equal')
         ax3[ii//5,ii%5].set_title('t = %.1f µs'%tdisp)
         if ii==len(tdisplay)-1:
@@ -230,6 +265,14 @@ if 1==0:
     fig3.savefig(os.path.join(image_dir, image_name+'_wig.png'))
     fig2.savefig(os.path.join(image_dir, image_name+'.png'))
     plt.show()
+    fign, axn = plt.subplots(1, 2)
+    axn[0].plot(tlist, parity)
+    axn[0].set_xlabel('time')
+    axn[0].set_ylabel('parity')
+    
+    axn[1].plot(tlist, nbara)
+    axn[1].set_xlabel('time')
+    axn[1].set_ylabel('nbar_a')
 
 if 1==0:
     fig3, ax3 = plt.subplots(2,2, figsize=(8,8))
@@ -249,7 +292,7 @@ if 1==0:
     ax3[1,0].set_aspect(1)
     ax3[1,1].set_aspect(1)
     
-if 1==1:
+if 1==0:
     dmax = 0.01 * kappab
     pmax = 0.01 * kappab
     numd = 11
