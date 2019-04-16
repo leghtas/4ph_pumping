@@ -27,7 +27,6 @@ h = sc.h
 fs = 25
 ls = 25
 
-
 def cosm(A):
     return ((1j*A).expm()+(-1j*A).expm())/2
 
@@ -434,7 +433,7 @@ class Circuit(object):
                 res = minimize(U1, x0, method='SLSQP', tol=1e-12)#, bounds=[(-3*np.pi, 3*np.pi), (-3*np.pi, 3*np.pi)]) ################################################################# becareful bounds
                 x0 = np.array([res.x])
             HessU = self.get_HessnL('U', 2, **kwargs)
-            quad = x0, HessU(x0)/2
+            quad = x0, HessU(x0)
 
         else:
             quad = self.get_quadratic_form(U) # not suported anymore
@@ -464,64 +463,87 @@ class Circuit(object):
         if mode == 'analytical':
             res = np.zeros(self.dim)
             HessT = self.get_HessnL('T', 2, **kwargs)
-            quad = res, HessT(res)/2
+            quad = res, HessT(res)
         else:
             quad = self.get_quadratic_form(T)
         return quad
 
-    def get_freqs_kerrs(self, particular=None, return_components=False, sort=True, **kwargs):
-
-        res = self.get_normal_mode_frame(sort=sort, **kwargs)
-        res1, res2, P, w2 = res
+    def get_freqs_kerrs(self, particulars=None, return_components=False, max_solutions=1, sort=False, **kwargs): #particulars should be list of tuple
+        res = self.get_normal_mode_frame(sort=False, **kwargs)
+        res1s, res2, Ps, w2s = res
         
-
-        fs = np.sqrt(w2)/2/np.pi
+        res1s = list(res1s)
+        Ps = list(Ps)
+        
+        fs = np.sqrt(w2s)/2/np.pi
 
         # calculate Kerrs from polynomial approximation of potential
-
         Hess2U = self.get_HessnL('U', 2,  **kwargs)
         Hess3U = self.get_HessnL('U', 3,  **kwargs)
         Hess4U = self.get_HessnL('U', 4,  **kwargs)
-
-        Hess2_r = Hess2U(res1, P=P)
-        Hess3_r = Hess3U(res1, P=P)
-        Hess4_r = Hess4U(res1, P=P)
-
-  
-
-        popt2 = np.array([Hess2_r[0, 0]/2, Hess2_r[1, 1]/2])
-        popt3 = np.array([Hess3_r[0, 0, 0]/6, Hess3_r[1, 1, 1]/6]) # coeff devant le phi**3
-        popt4 = np.array([Hess4_r[0, 0, 0, 0]/24, Hess4_r[1, 1, 1, 1]/24]) # coeff devant le phi**4
         
-        ZPF = popt2**(-1./4)/4**0.5 # hbar*w/2 is the term in front of a^+.a in the hamiltonian coming from phi**2, the other half is from dphi**2 
-        
-        if particular is not None:
-            factor, power = get_factor(particular)
-            if len(particular)==2:
-                Hessp_r = Hess2_r
-                poptp = Hessp_r[particular[0], particular[1]]/factor
-                Xip = poptp*(ZPF[particular[0]]*ZPF[particular[0]])/2/np.pi
-            elif len(particular)==3:
-                Hessp_r = Hess3_r       
-                poptp = Hessp_r[particular[0], particular[1], particular[2]]/factor
-                Xip = poptp*(ZPF[particular[0]]*ZPF[particular[1]]*ZPF[particular[2]])/2/np.pi
-            elif len(particular)==4:
-                Hessp_r = Hess4_r 
-                poptp = Hessp_r[particular[0], particular[1], particular[2], particular[3]]/factor
-                Xip = poptp*(ZPF[particular[0]]*ZPF[particular[1]]*ZPF[particular[2]]*ZPF[particular[3]])/2/np.pi
-        else:
-            Xip = None
+        Xi2s = []
+        Xi3s = []
+        Xi4s = []
+        Xips = []
+        for res1, P in zip(res1s, Ps):
+            Hess2_r = Hess2U(res1, P=P)
+            Hess3_r = Hess3U(res1, P=P)
+            Hess4_r = Hess4U(res1, P=P)
             
-        # factor 4 see former remark so in front of phi**2 we got w/4 (one 2 come from developping (a^+ + a)**2, the other from the kinetic part)
-        Xi2 = 4 * popt2*(ZPF**2)/2/np.pi # freq en Hz : coeff devant a^+.a (*2 to get whole freq)
-        Xi3 = 3 * popt3*(ZPF**3)/2/np.pi #coeff devant a^2.a^+
-        Xi4 = 6 * popt4*(ZPF**4)/2/np.pi #coeff devant a^2.a^+2
-
-#        check_Xi2 = w2**0.5/2/np.pi
+            popt2 = 2*np.array([Hess2_r[ii, ii]/2 for ii in range(self.dim)]) # 1/2*U_matrix**2 ie un w/2 vient de u et un w/2 vient de T
+            popt3 = np.array([Hess3_r[ii, ii, ii]/6 for ii in range(self.dim)])
+            popt4 = np.array([Hess4_r[ii, ii, ii, ii]/24 for ii in range(self.dim)])
+            
+#            print('popt2') 
+#            print(popt2) # should be omega/2 1/2*w/2*phi**2 for linear part of potential energy
+            if particulars is not None:
+                Xip = []
+                for particular in particulars:
+                    factor = get_factor(particular)
+                    if len(particular)==2:
+                        poptp = Hess2_r[particular]/factor
+                        Xip.append(poptp/2/np.pi)
+                    elif len(particular)==3:
+                        poptp = Hess3_r[particular]/factor
+                        Xip.append(poptp/2/np.pi)
+                    elif len(particular)==4:
+                        poptp = Hess4_r[particular]/factor
+                        Xip.append(poptp/2/np.pi)
+                Xip = np.array(Xip)
+            else:
+                Xip = None
+                
+            # factor 2 see former remark so in front of phi**2 we got w/4 (one 2 come from developping (a^+ + a)**2, the other from the kinetic part)
+            Xi2 = 2 * popt2/2/np.pi # freq en Hz : coeff devant a^+.a (*2 to get whole freq)
+            Xi3 = 3 * popt3/2/np.pi #coeff devant a^2.a^+
+            Xi4 = 6 * popt4/2/np.pi #coeff devant a^2.a^+2
+            
+            Xi2s.append(Xi2)
+            Xi3s.append(Xi3)
+            Xi4s.append(Xi4)
+            Xips.append(Xip)
+    
+        n_solutions = len(Xi2s)
+        if n_solutions<max_solutions:
+            for ii, item in enumerate([Xi2s, Xi3s, Xi4s, res1s, Xips, Ps]):
+                if item[0] is not None:
+                    to_add = np.nan*np.ones(item[0].shape)
+                    to_adds = [to_add]*(max_solutions-n_solutions)
+                    item += to_adds
+                else:
+                    to_adds = [None]*(max_solutions-n_solutions)
+                    item += to_adds
+                    
+        return_list = [Xi2s, Xi3s, Xi4s, res1s, Xips, Ps]
+        for ii, item in enumerate(return_list):
+            return_list[ii] = np.array(item[:max_solutions])
+        Xi2s, Xi3s, Xi4s, res1s, Xips, Ps = return_list
+                
         if return_components:
-            return res1, res2, Xi2, Xi3, Xi4, Xip
+            return res1s, res2, Xi2s, Xi3s, Xi4s, Xips, Ps
         else:
-            return res1, res2, Xi2, Xi3, Xi4, Xip, P
+            return res1s, res2, Xi2s, Xi3s, Xi4s, Xips, None
 
     def get_freqs_only(self, sort=True, **kwargs):
         res = self.get_normal_mode_frame(sort=sort,**kwargs)
@@ -541,8 +563,13 @@ class Circuit(object):
     #        w0, v0 = self.reorder(*(nl.eigh(T0)), 0, debug=False)
             sqrtw = sl.sqrtm(np.diag(w0))
             U1 = np.dot(np.dot(nl.inv(v0), U0), v0)
+            T1 = np.dot(np.dot(nl.inv(v0), T0), v0)
             U2 = np.dot(np.dot(nl.inv(sqrtw), U1), nl.inv(sqrtw))
+            T2 = np.dot(np.dot(nl.inv(sqrtw), T1), nl.inv(sqrtw))
             w2, v2 = nl.eigh(U2)
+#            T2 = identité
+#            U2 = matric qcq
+#            w2 = list omega**2
             
     #        w2, v2 = self.reorder(w2, v2, 2, debug=False)
     
@@ -552,15 +579,44 @@ class Circuit(object):
             if sort:
                 w2, P = self.reorder(w2, P, 2)
     
-            invP = np.dot(np.dot(nl.inv(v2), nl.inv(sqrtw)), nl.inv(v0))
+            tP = np.dot(np.dot(v2.T, nl.inv(sqrtw)), v0.T)
     
-            pseudo_invP = np.dot(np.dot(nl.inv(v2), np.diag(w0**0.5)), nl.inv(v0))
             
-            wU3 = np.diag(np.dot(np.dot(invP, U0), P))
+            wT3 = np.dot(np.dot(tP, T0), P)
+            wU3 = np.dot(np.dot(tP, U0), P)
+
+            
+            phiZPF = np.sqrt(1/2/np.sqrt(w2))
+            wU3 = np.diag(phiZPF)*wU3*np.diag(phiZPF)
+            P = np.dot(np.diag(phiZPF), P)
+            tP = np.dot(tP, np.diag(phiZPF))
+            wT3 = np.dot(np.dot(tP, T0), P)
+            wU3 =np.dot(np.dot(tP, U0), P)
+            
+#            print('T&U')
+#            print(wT3)
+#            print(wU3)
+
             Ps.append(P)
-            w2s.append(w2)
+            w2s.append(w2) # differents minima
+#            self.print_P(P)
 
         return res1s, res2, np.array(Ps), np.array(w2s)
+    
+    def print_P(self, P):
+        print('\n### P ###')
+        p = self.U_variables
+        for ii, p_j in enumerate(p):
+            to_print = p_j + ' = '
+            to_add = ''
+            for jj in range(self.dim):
+                to_add = to_add+'%.5f'%P[ii,jj]+'*p%d + '%(jj)
+            to_print += to_add[:-3]
+            print(to_print)
+        print('   with :')
+        for jj in range(self.dim):
+            print('   p%d = a%d + a%d^+'%(jj, jj, jj))
+        print('#########\n')
     
     def reorder(self, values, vectors, either0_or2, debug=False):
         dim = len(values)
