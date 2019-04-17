@@ -45,6 +45,7 @@ class CircuitTrmCav(c.Circuit):
         print(self.ECc)
         print(self.ECa)
         self.varying_params={}
+
         
         self.U_str = 'ELa/2/hbar*pa**2 \
                       + EJ/2/hbar*p**2 \
@@ -54,10 +55,36 @@ class CircuitTrmCav(c.Circuit):
         self.T_str = '(1/16.)*(hbar/EC)*(dp)**2 \
                       + (1/16.)*(hbar/ECc)*(dp-dpa)**2 \
                       + (1/16.)*(hbar/ECa)*(dpa)**2'
+            
+        print('\nCoeffs')
+        print(1/8*hbar/self.EC+1/8*hbar/self.ECc)
+        print(1/8*hbar/self.ECc)
+        print(1/8*hbar/self.ECa+1/8*hbar/self.ECc)
+        
+        print('\n')
+        print(self.ELa/hbar)
+        print(self.EJ/hbar)
+        
+        self.wa_t = 1/np.sqrt(La*(Ca+Cc))
+        self.w_t = 1/np.sqrt(LJ*(CJ+Cc))
+        self.phiZPFa_t = np.sqrt(La*hbar*self.wa_t/2)/phi0
+        self.phiZPFj_t = np.sqrt(LJ*hbar*self.w_t/2)/phi0
+
+
+        self.g = np.sqrt(wa*w/(4*(1+CJ/Cc)*(1+Ca/Cc)))
+        
+        self.phiZPFa = np.sqrt(La*hbar*wa/2)/phi0
+        self.phiZPFj = np.sqrt(LJ*hbar*w/2)/phi0
+        print('ELa, EJ')
+        print(self.ELa, self.EJ)
         
         if printParams:
+            
             print("EJ/h = "+str(1e-9*self.EJ/hbar/2/pi)+" GHz")
             print("EC/h = "+str(1e-9*self.EC/hbar/2/pi)+" GHz")
+            print(1/np.sqrt(1/8*hbar/self.EC))
+            print(1/(1/8*hbar/self.ECa)*self.ELa/hbar)
+            print(1/(1/8*hbar/self.EC)*self.EJ/hbar)
         
         self.max_order = 4
         super().__init__()

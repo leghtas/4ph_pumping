@@ -562,10 +562,10 @@ class Circuit(object):
             w0, v0 = nl.eigh(T0)
     #        w0, v0 = self.reorder(*(nl.eigh(T0)), 0, debug=False)
             sqrtw = sl.sqrtm(np.diag(w0))
-            U1 = np.dot(np.dot(nl.inv(v0), U0), v0)
-            T1 = np.dot(np.dot(nl.inv(v0), T0), v0)
+            U1 = np.dot(np.dot(v0.T, U0), v0)
+#            T1 = np.dot(np.dot(v0.T, T0), v0)
             U2 = np.dot(np.dot(nl.inv(sqrtw), U1), nl.inv(sqrtw))
-            T2 = np.dot(np.dot(nl.inv(sqrtw), T1), nl.inv(sqrtw))
+#            T2 = np.dot(np.dot(nl.inv(sqrtw), T1), nl.inv(sqrtw))
             w2, v2 = nl.eigh(U2)
 #            T2 = identité
 #            U2 = matric qcq
@@ -573,33 +573,26 @@ class Circuit(object):
             
     #        w2, v2 = self.reorder(w2, v2, 2, debug=False)
     
-    
             P = np.dot(np.dot(v0, nl.inv(sqrtw)), v2)
-    #        print(w0)
             if sort:
                 w2, P = self.reorder(w2, P, 2)
     
-            tP = np.dot(np.dot(v2.T, nl.inv(sqrtw)), v0.T)
-    
-            
-            wT3 = np.dot(np.dot(tP, T0), P)
-            wU3 = np.dot(np.dot(tP, U0), P)
+#            tP = np.dot(np.dot(v2.T, nl.inv(sqrtw)), v0.T)
 
+            
+#            T3 = np.dot(np.dot(tP, T0), P)
+#            U3 = np.dot(np.dot(tP, U0), P)
             
             phiZPF = np.sqrt(1/2/np.sqrt(w2))
-            wU3 = np.diag(phiZPF)*wU3*np.diag(phiZPF)
-            P = np.dot(np.diag(phiZPF), P)
-            tP = np.dot(tP, np.diag(phiZPF))
-            wT3 = np.dot(np.dot(tP, T0), P)
-            wU3 =np.dot(np.dot(tP, U0), P)
-            
-#            print('T&U')
-#            print(wT3)
-#            print(wU3)
 
+#            U3 = np.dot(np.dot(np.diag(phiZPF),U3),np.diag(phiZPF))
+            P = np.dot(P, np.diag(phiZPF))
+#            tP = np.dot(np.diag(phiZPF), tP)
+#            T3 = np.dot(np.dot(tP, T0), P)
+#            U3 =np.dot(np.dot(tP, U0), P)
+ 
             Ps.append(P)
             w2s.append(w2) # differents minima
-#            self.print_P(P)
 
         return res1s, res2, np.array(Ps), np.array(w2s)
     

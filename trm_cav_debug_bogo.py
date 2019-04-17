@@ -38,11 +38,11 @@ plt.close('all')
 
 
 LJ = 6000e-12
-w = 4e9*2*pi
+w = 3e9*2*pi
 wa, Za = [8e9*2*np.pi, 50]
 
 
-Cc = 100e-16 #F
+Cc = 10e-16 #F
 
 _, _, EJ = circuit.get_E_from_w(1, 1, LJ) #dLJ should be 0 to compute non-linearities !!!!!
 
@@ -82,6 +82,65 @@ if 1==1:
     Xi3 = Xi3s[0]
     Xi4 = 2*Xi4s[0]
     Xip = Xips[0]*factors_particulars
+
+    print('g/Delta = '+str(c.g/np.abs(wa-w)))
+    phiZPFa = c.phiZPFa
+    phiZPFj = c.phiZPFj
+    kerr_mem = 2*EJ/24*phiZPFa**4*(c.g/np.abs(wa-w))**4*6/c.hbar/2/np.pi*1e-6
+    cross_kerr = EJ/24*phiZPFa**2*phiZPFj**2*(c.g/np.abs(wa-w))**2*4/c.hbar/2/np.pi*1e-6/2
+    kerr = 2*EJ/24*phiZPFj**4*6/c.hbar/2/np.pi*1e-6
+    print('cross_kerr = %.4f MHz'%cross_kerr)
+    print('kerr = %.3f MHz'%kerr)
+    
+    wa_t = c.wa_t
+    w_t = c.w_t
+    bogo = np.array([[wa_t, 0, c.g, -c.g], 
+                     [0, -wa_t, c.g, -c.g], 
+                     [c.g, -c.g, w_t, 0],
+                     [c.g, -c.g, 0, -w_t]])
+    e, v = np.linalg.eig(bogo)
+    
+    
+    bogo_simple = np.array([[wa_t, c.g], 
+                            [c.g, w_t]])
+    e_s, v_s = np.linalg.eig(bogo_simple)
+    
+
+    print(e/2/np.pi*1e-9)
+    print(e_s/2/np.pi*1e-9)
+    print(v)
+    print(v_s)
+    inv_v = np.linalg.inv(v)
+    
+#    print(c.phiZPFj_t*v[0])
+    print('phib original')
+    print(c.phiZPFa_t*(inv_v[0]+inv_v[3]))
+    print(c.phiZPFj_t*(inv_v[1]+inv_v[2]))
+    
+    print('phiZPF')
+    print(phiZPFa, phiZPFj)
+
+    cross_Kerr = EJ/24*P[0,0]**2*P[0,1]**2
+    
+    print('\ntest freq')
+    exp_omegaO2 = 2*c.EJ/c.hbar*P[0,0]**2
+    print(exp_omegaO2/2/np.pi*1e-9)
+    print(Xi2[0]*1e-9)
+    print('\ntest_Kerr')
+    exp_Kerr = c.EJ/c.hbar/24*P[0,0]**4*2*6
+    print(exp_Kerr/2/np.pi*1e-6)
+    print(Xi4[0]*1e-6)
+    
+    print('\ntest_Kerr_mem')
+    exp_Kerr = c.EJ/c.hbar/24*P[0,1]**4*2*6
+    print(exp_Kerr/2/np.pi*1e-6)
+    print(Xi4[1]*1e-6)
+    
+    print('\ntest_cross_Kerr')
+    exp_Kerr = c.EJ/c.hbar/24*P[0,1]**2*P[0,0]**2*4*6
+    print(exp_Kerr/2/np.pi*1e-6)
+    print(Xip[0]*1e-6)
+
     
 
     print('\nf_cav = %.5f GHz'%(Xi2[1]/1e9))
@@ -91,3 +150,7 @@ if 1==1:
     
     print('\nf_trm = %.3f GHz'%(Xi2[0]/1e9))
     print('Kerr_trm = %.3f MHz\n'%(Xi4[0]/1e6))
+    
+    print('ratio_kerr = %.3f'%(Xi4[0]/1e6/kerr))
+    print('ratio_cross = %.3f'%(Xip[0]/1e6/cross_kerr))
+    print('ratio_mem = %.3f'%(Xi4[1]/1e6/kerr_mem))
