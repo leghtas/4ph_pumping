@@ -9,7 +9,7 @@ import scipy.constants as sc
 import numpy as np
 import matplotlib.pyplot as plt
 import circuit
-import circuit_SnailPA_4 as cspa
+import circuitSPA as cspa
 import scipy.linalg as sl
 import numpy.linalg as nl
 import numdifftools as nd
@@ -24,7 +24,8 @@ plt.close('all')
 #I0 = 7.1*1e-6 #A EJ=phi0*I0
 
 #Z, w, LJ, N, alpha, n = [50, 8*1e9*2*np.pi, 60e-12, 1, 0.29, 3]
-w0, wa, LJ, N, alpha, n = [10.53*1e9*2*np.pi, 4.45*1e9*2*np.pi, 0.1e-9, 20, 0.1, 3]
+#w0, wa, LJ, N, alpha, n = [10.53*1e9*2*np.pi, 4.45*1e9*2*np.pi, 0.1e-9, 20, 0.1, 3]
+w0, wa, LJ, N, alpha, n = [10*10.53*1e9*2*np.pi, 4.45*1e9*2*np.pi, 2*0.1e-9, 1, 1, 1]
 #w0, wa, LJ, N, alpha, n = [14.89*1e9*2*np.pi, 5.64*1e9*2*np.pi, 0.1e-9, 20, 0.1, 3]
 #LJ, N, alpha, n = [40e-12, 20, 0.01, 3]
 
@@ -34,7 +35,8 @@ EC, EL, EJeq = circuit.get_E_from_w0_wa_LJ(w0, wa, LJeq)
 #EJ, LJ, I0 = circuit.convert_EJ_LJ_I0(I0=I0)
 
 EJ = phi0**2/LJ
-c = cspa.CircuitSnailPA(EC, EL, EJ, alpha, n, N=N, printParams=True)
+ECJ = EC*100
+c = cspa.CircuitSPA(EL, EJ, EC, ECJ, N, n, alpha)
 
 min_phi = -2*pi
 max_phi = 2*pi
@@ -64,14 +66,14 @@ if 1==0:
 # Get freqs and Kerrs v.s. flux
 if 1==1:
     for kk, xx in enumerate(phiVec):
-        _res = c.get_freqs_kerrs(phi_ext_0=xx)
+        _res = c.get_freqs_kerrs(pext=xx)
         res1, res2, Xi2s, Xi3s, Xi4s, check_Xi2s = _res
         Xi2[:, kk] = Xi2s
         Xi3[:, kk] = Xi3s
         Xi4[:, kk] = Xi4s
         check_Xi2[:, kk] = check_Xi2s
-        resx[kk] = res1[0]
-        resy[kk] = res1[1]
+        resx[kk] = res1[0][0]
+        resy[kk] = res1[0][1]
 
 # PLOT
 if 1==1:
@@ -200,9 +202,3 @@ if 1==0:
     ax3[1,2].axis('equal')
     #ax2[1].plot(phi_ext_sweep/np.pi, gradUval_)
 # -*- coding: utf-8 -*-
-"""
-Created on Sat Apr 20 16:16:03 2019
-
-@author: Zaki
-"""
-

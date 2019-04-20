@@ -152,7 +152,6 @@ class Circuit(object):
         self.hbar = hbar
         self.pi = pi
 
-        
         self.anyUs={}
         self.anyTs={}
         self.prepare_U_formal()
