@@ -32,11 +32,14 @@ w0, wa, LJ, N, alpha, n = [10*10.53*1e9*2*np.pi, 4.45*1e9*2*np.pi, 2*0.1e-9, 1, 
 LJeq = N*(1/(1/(LJ*n)+ 1/(LJ/alpha)))
 EC, EL, EJeq = circuit.get_E_from_w0_wa_LJ(w0, wa, LJeq)
 
+EC, EL, _ = circuit.get_E_from_w(4.45*1e9*2*np.pi, 50, 1)
+EC2, EL2, _ = circuit.get_E_from_w(6*1e9*2*np.pi,50, 1)
+
 #EJ, LJ, I0 = circuit.convert_EJ_LJ_I0(I0=I0)
 
 EJ = phi0**2/LJ
 ECJ = EC*100
-c = cspa.CircuitSPA(EL, EJ, EC, ECJ, N, n, alpha)
+c = cspa.CircuitSPA(EL, EL2, EC, EC2, N, n, alpha)
 
 min_phi = -2*pi
 max_phi = 2*pi

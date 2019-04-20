@@ -318,7 +318,7 @@ class Circuit(object):
             raise Exception
             
     def get_U_matrix(self, mode = 'analytical', search = 'numerical', **kwargs):
-        search='global'
+        #search='global'
         U = self.get_any_precomp_L('U', (0,)*self.dim, **kwargs)
 #        print(U([1,2]))
         if mode == 'analytical':
