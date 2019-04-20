@@ -67,6 +67,15 @@ def get_E_from_w(w, Z, LJ):
     return EC, EL, EJ
 
 
+def get_E_from_w0_wa_LJ(w0, wa, LJ):
+    C = (1/wa**2-1/w0**2)/LJ
+    L = 1/w0**2/C
+    EL = phi0**2/L
+    EC = e**2/2/C
+    EJ = phi0**2/LJ
+    return EC, EL, EJ
+
+
 def get_phi_EJ_from_Z_LJ(Za, Zb, LJ):
     phia = (1/phi0) * (np.sqrt((hbar/2)*Za))  # phiZPF
     phib = (1/phi0) * (np.sqrt((hbar/2)*Zb))  # phiZPF
