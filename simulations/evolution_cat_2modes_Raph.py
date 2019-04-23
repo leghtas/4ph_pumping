@@ -42,7 +42,8 @@ solve1mode = False
 solve2mode = True
 solve3mode = False
 
-alpha0 = np.sqrt(8)*np.exp(1j*np.pi/2)
+nbar0 = 0.1
+alpha0_pump = np.sqrt(nbar0)*np.exp(1j*np.pi/2)
 g2 = 2 * np.pi * 1
 Kerr = 2 * np.pi * 0.05*0
 
@@ -73,20 +74,20 @@ b = qt.destroy(Nb)
 #
 H1 = -Kerr * a.dag()**2*a**2 + drive*(a.dag()-a)/1j
 H2 = (qt.tensor(H1, qt.identity(Nb)) +
-      g2*qt.tensor((a**2-alpha0**2), b.dag()) +
-          g2*qt.tensor((a.dag()**2-alpha0.conjugate()**2), b) -
+      g2*qt.tensor((a**2-alpha0_pump**2), b.dag()) +
+          g2*qt.tensor((a.dag()**2-alpha0_pump.conjugate()**2), b) -
       chiab*(qt.tensor(a.dag()*a, b.dag()*b)))
 H2det = ((delta_p+delta_d)/2 * qt.tensor(a.dag()*a, qt.identity(Nb)) +
         delta_d * qt.tensor(qt.identity(Na), b.dag()*b))
 H3 = qt.tensor(H2, qt.identity(2)) + chi * qt.tensor(a.dag()*a, qt.identity(Nb),
                (qt.sigmaz()+qt.identity(2))/2)
 
-psi01 = qt.coherent(Na, 0*alpha0)
-ketalpha0 = qt.coherent(Na, alpha0)
-ketmalpha0 = qt.coherent(Na, -alpha0)
+psi01 = qt.coherent(Na, 0*alpha0_pump)
+ketalpha0 = qt.coherent(Na, alpha0_pump)
+ketmalpha0 = qt.coherent(Na, -alpha0_pump)
 
 c_ops1 = [np.sqrt(kappaa)*a,
-          np.sqrt(kappa2)*(a**2-alpha0**2),
+          np.sqrt(kappa2)*(a**2-alpha0_pump**2),
           np.sqrt(kappaphi)*(a.dag()*a)]
 c_ops2 = [np.sqrt(kappaa)*qt.tensor(a, qt.identity(Nb)),
           np.sqrt(kappab)*qt.tensor(qt.identity(Na), b),
@@ -97,9 +98,11 @@ c_ops3 = [np.sqrt(kappaa)*qt.tensor(a, qt.identity(Nb), qt.identity(2)),
           np.sqrt(nth/T1)*qt.tensor(qt.identity(Na), qt.identity(Nb), qt.sigmap()),
           np.sqrt((1+nth)/T1)*qt.tensor(qt.identity(Na), qt.identity(Nb), qt.sigmam())]
 
-#
+alpha0_prep = np.sqrt(0.1)*np.exp(1j*np.pi/2)
+
+
 Nwig = 101
-xvec = np.linspace(-np.abs(alpha0)-1, np.abs(alpha0)+1, Nwig)
+xvec = np.linspace(-np.abs(alpha0_pump)-1, np.abs(alpha0_pump)+1, Nwig)
 xarr, yarr = np.meshgrid(xvec, xvec)
 alphaarr = xarr+1j*yarr
 dx = xvec[1]-xvec[0]
@@ -110,19 +113,29 @@ dx = xvec[1]-xvec[0]
 #ax0.pcolor(xvec, xvec, W3)
 #ax0.axis('equal')
 
-#alpha0 = alpha0*np.exp(1j*np.pi/2)
 
-psi01_0 = qt.coherent(Na, alpha0)
-psi01_1 = qt.coherent(Na, -alpha0)
-psi01_plus = psi01_0+psi01_1
-psi01_minus = psi01_0-psi01_1
 
-psi02 = qt.tensor(psi01_1, qt.basis(Nb, 0))
+psi01_0 = qt.coherent(Na, alpha0_prep)
+psi01_1 = qt.coherent(Na, -alpha0_prep)
+
+overlap = np.abs((psi01_0.dag()*psi01_1.full())[0,0])
+print('###### OVERLAP ######')
+print('Overlap = %.3f'%overlap)
+psi01_plus = (psi01_0+psi01_1)/(psi01_0+psi01_1).norm()
+psi01_minus = (psi01_0-psi01_1)/(psi01_0-psi01_1).norm()
+overlap2 = np.abs((psi01_plus.dag()*psi01_minus.full())[0,0])
+print('Overlap_cat = %.3f'%overlap2)
+
+psi01_0 = (psi01_plus+psi01_minus)/2**0.5
+psi01_1 = (psi01_plus-psi01_minus)/2**0.5
+
+psi02 = qt.tensor(psi01_0, qt.basis(Nb, 0))
+psi02_bis = qt.tensor(psi01_1, qt.basis(Nb, 0))
 psi03 = qt.tensor(psi01, qt.basis(Nb, 0), qt.basis(2,1))
 rho03 = qt.tensor(psi01*psi01.dag(), qt.basis(Nb, 0)*qt.basis(Nb, 0).dag(),
                   qt.projection(2, 1, 1)*(1-nth)+qt.projection(2, 0, 0)*nth)
 
-e1 = 2*np.pi*0.8
+e1 = 2*np.pi*0.0
 omega_drive = 2*np.pi*0.0
 
 
@@ -157,6 +170,7 @@ if 1==1:
     if solve2mode:
         fock0 = qt.basis(Na, 0)
         result2 = qt.mesolve([H2+0*H2det,[H1_drive1, H1_drive1_coeff], [H1_drive2, H1_drive2_coeff]], psi02, tlist, c_ops2, [],  args={'omega_drive': omega_drive})
+        result2_bis = qt.mesolve([H2+0*H2det,[H1_drive1, H1_drive1_coeff], [H1_drive2, H1_drive2_coeff]], psi02_bis, tlist, c_ops2, [],  args={'omega_drive': omega_drive})
         energy_0 = qt.expect(H1_drive, ketalpha0)
         energy_1 = qt.expect(H1_drive, ketmalpha0)
         print('energy |0\ = %.3f'%energy_0)
@@ -169,6 +183,7 @@ if 1==1:
         popup = []
         popdown = []
         W2s = []
+        W2s_bis = []
         parity = []
         nbara = []
         for ii, t in enumerate(tlist):
@@ -177,8 +192,11 @@ if 1==1:
             bt2.append(qt.expect(qt.tensor(qt.identity(Na), b**2),
                                  result2.states[ii]))
             rhoa = result2.states[ii].ptrace(0)
+            rhoa_bis = result2_bis.states[ii].ptrace(0)
             W2 = qt.wigner(rhoa, xvec, xvec, g=2)
+            W2_bis = qt.wigner(rhoa_bis, xvec, xvec, g=2)
             W2s.append(W2)
+            W2s_bis.append(W2_bis)
             dist = np.sum(W2, axis=1)*dx
     
             popup.append(np.sum(dist[0:int(Nwig/2)+1])*dx)
@@ -237,6 +255,7 @@ if 1==1:
     ax2.set_ylabel('proj on alpha')
     ax2.legend()
     fig3, ax3 = plt.subplots(2,5, figsize=(12,6))
+    fig4, ax4 = plt.subplots(2,5, figsize=(12,6))
     T_disp = T
     dt_disp = T_disp/10
 
@@ -244,21 +263,23 @@ if 1==1:
 
     for ii, tdisp in enumerate(tdisplay):
         index_T = np.argmin(np.abs(tlist-tdisp))
-        
-        ax3[ii//5,ii%5].pcolor(xvec, xvec, np.pi/2*W2s[index_T], cmap=wigner_cm, vmin=-1, vmax=1)
+        ax3[ii//5,ii%5].pcolor(xvec, xvec, np.pi/2*(W2s[index_T]+0*W2s_bis[index_T]), cmap=wigner_cm, vmin=-1, vmax=1)
         ax3[ii//5,ii%5].set_aspect('equal')
         ax3[ii//5,ii%5].set_title('t = %.1f µs'%tdisp)
+        ax4[ii//5,ii%5].pcolor(xvec, xvec, np.pi/2*(0*W2s[index_T]+W2s_bis[index_T]), cmap=wigner_cm, vmin=-1, vmax=1)
+        ax4[ii//5,ii%5].set_aspect('equal')
+        ax4[ii//5,ii%5].set_title('t = %.1f µs'%tdisp)
         if ii==len(tdisplay)-1:
             disp = (W2s[index_T]*alphaarr).sum()*dx**2
             print(disp)
-            print(drive/np.abs(alpha0)**2/kappa2/2)
+            print(drive/np.abs(alpha0_pump)**2/kappa2/2)
             
     folder = os.getcwd()
     image_dir = os.path.join(folder,"simus")
     if not os.path.isdir(image_dir): os.makedirs(image_dir)
     
     image_name = 'g2o2pi_%s_kappaao2pi_%s_nbar0_%s_kappaphio2pi_%s' % \
-                    (g2/2/np.pi, kappaa/2/np.pi, np.abs(alpha0)**2, kappaphi)
+                    (g2/2/np.pi, kappaa/2/np.pi, np.abs(alpha0_pump)**2, kappaphi)
     fig3.suptitle(image_name)
     fig2.suptitle(image_name)
 
