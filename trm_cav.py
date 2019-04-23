@@ -72,7 +72,7 @@ if 1==1:
     max_solutions = 1
     particulars = [(0,0,1,1)] # term in front of (a+a^+)**2(b+b^+)**2
     factors_particulars = np.array([4]) # term in front of (a+a^+)**2(b+b^+)**2
-        
+    
     _res  = c.get_freqs_kerrs(particulars=particulars, return_components=True, max_solutions=max_solutions)
     res1, res2, Xi2s, Xi3s, Xi4s, Xips, Ps = _res
     # [0] cause only one solution

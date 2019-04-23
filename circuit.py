@@ -258,7 +258,7 @@ class Circuit(object):
         
     def get_HessnL(self, UorT, n, **kwargs):
         def _HessnL(p, P=np.identity(self.dim)):
-#            p = P.dot(p)   
+            p = P.dot(p)   
             _HessnL= []
             for which in which_list(n, self.dim):
                 _HessnL.append(self.get_any_precomp_L(UorT, which, **kwargs)(p))
@@ -442,6 +442,8 @@ class Circuit(object):
                 x0 = np.array([res.x])
             HessU = self.get_HessnL('U', 2, **kwargs)
             quad = x0, HessU(x0)
+            print('res get_U_matrix')
+            print(x0)
 
         else:
             quad = self.get_quadratic_form(U) # not suported anymore
@@ -479,7 +481,8 @@ class Circuit(object):
     def get_freqs_kerrs(self, particulars=None, return_components=False, max_solutions=1, sort=False, **kwargs): #particulars should be list of tuple
         res = self.get_normal_mode_frame(sort=False, **kwargs)
         res1s, res2, Ps, w2s = res
-        
+        print('res1 get_freqs_kerr')
+        print(res1s)
         res1s = list(res1s)
         Ps = list(Ps)
         
@@ -526,7 +529,6 @@ class Circuit(object):
             Xi2 = 2 * popt2/2/np.pi # freq en Hz : coeff devant a^+.a (*2 to get whole freq)
             Xi3 = 3 * popt3/2/np.pi #coeff devant a^2.a^+
             Xi4 = 6 * popt4/2/np.pi #coeff devant a^2.a^+2
-            
             Xi2s.append(Xi2)
             Xi3s.append(Xi3)
             Xi4s.append(Xi4)
@@ -554,7 +556,7 @@ class Circuit(object):
             return res1s, res2, Xi2s, Xi3s, Xi4s, Xips, None
 
     def get_freqs_only(self, sort=True, **kwargs):
-        res = self.get_normal_mode_frame(sort=sort,**kwargs)
+        res = self.get_normal_mode_frame(sort=False,**kwargs)
         res1, res2, P, w2 = res
         fs = np.sqrt(w2)/2/np.pi
         return fs
@@ -562,7 +564,6 @@ class Circuit(object):
     def get_normal_mode_frame(self, sort=True, **kwargs):
         res1s, U0s = self.get_U_matrix(mode = 'analytical', **kwargs)
         res2, T0 = self.get_T_matrix(mode = 'analytical', **kwargs)
-        
         
         Ps = []
         w2s = []
@@ -585,12 +586,10 @@ class Circuit(object):
             if sort:
                 w2, P = self.reorder(w2, P, 2)
     
-#            tP = np.dot(np.dot(v2.T, nl.inv(sqrtw)), v0.T)
+            #tP = np.dot(np.dot(v2.T, nl.inv(sqrtw)), v0.T)
 
-            
 #            T3 = np.dot(np.dot(tP, T0), P)
 #            U3 = np.dot(np.dot(tP, U0), P)
-            
             phiZPF = np.sqrt(1/2/np.sqrt(w2))
 
 #            U3 = np.dot(np.dot(np.diag(phiZPF),U3),np.diag(phiZPF))
