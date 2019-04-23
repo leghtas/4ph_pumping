@@ -257,8 +257,7 @@ class Circuit(object):
         return anyL
         
     def get_HessnL(self, UorT, n, **kwargs):
-        def _HessnL(p, P=np.identity(self.dim)):
-            p = P.dot(p)   
+        def _HessnL(p, P=np.identity(self.dim)):  
             _HessnL= []
             for which in which_list(n, self.dim):
                 _HessnL.append(self.get_any_precomp_L(UorT, which, **kwargs)(p))

@@ -43,16 +43,16 @@ class CircuitSPA(c.Circuit):
 #        self.phi_ext_0 = 0
 #        self.varying_params={'ECca':0}
         
-#        self.U_str = '0.5*(EL/hbar)*(pC-pJ)**2 \
-#                      - NN*alpha*(EJ/hbar)*cos(pJ/NN) \
-#                      - NN*nn*(EJ/hbar)*cos((NN*pext-pJ)/nn/NN)'
-#                 
-#        self.T_str = '(1/16.)*(hbar/EC)*(dpC)**2 \
-#                      + (1/16.)*(hbar/ECJ)*(dpJ)**2'
-                      
-        self.U_str = '0.5*(EL/hbar)*(pC)**2-(EJ/hbar)*(cos(pJ-pext)+cos(pJ))'
+        self.U_str = '0.5*(EL/hbar)*(pC-pJ)**2 \
+                      - NN*alpha*(EJ/hbar)*cos(pJ/NN) \
+                      - NN*nn*(EJ/hbar)*cos((NN*pext-pJ)/nn/NN)'
                  
-        self.T_str = '(1/16.)*(hbar/EC)*(dpC)**2+(1/16.)*(hbar/ECJ)*(dpJ)**2'
+        self.T_str = '(1/16.)*(hbar/EC)*(dpC)**2 \
+                      + (1/16.)*(hbar/ECJ)*(dpJ)**2'
+                      
+#        self.U_str = '0.5*(EL/hbar)*(pC)**2-(EJ/hbar)*(cos(pJ-pext)+cos(pJ))'
+#                 
+#        self.T_str = '(1/16.)*(hbar/EC)*(dpC)**2+(1/16.)*(hbar/ECJ)*(dpJ)**2'
         
         self.max_order = 4
         super().__init__()
