@@ -23,14 +23,34 @@ plt.close('all')
 #LJ = 1.32e-08
 #I0 = 7.1*1e-6 #A EJ=phi0*I0
 
+new_device = True
+if new_device:
+    # tune up procedure:
+    #  wa: fix for desired working point: 7.5 GHz < 8
+    # LJ = largest possible for acceptable Kerr
+    # w0 = frequency of mode when LJ=0. Closest possible to wa, with acceptable LGeometric (i.e < nH)
+    # alpha = tune asymetry of LJ*n and LJ/alpha for desired tunability
+    w0, wa, LJ, N, alpha, n = [9*1e9*2*np.pi, 7.5*1e9*2*np.pi, 0.05e-9, 1, 0.2, 3]
 # Low
-w0, wa, LJ, N, alpha, n = [10.53*1e9*2*np.pi, 4.7*1e9*2*np.pi, 0.1e-9, 20, 0.1, 3]
+# w0, wa, LJ, N, alpha, n = [15*1e9*2*np.pi, 7.5*1e9*2*np.pi, 0.043e-9, 1, 0.8, 1]
+#w0, wa, LJ, N, alpha, n = [15*1e9*2*np.pi, 7.5*1e9*2*np.pi, 0.043e-9, 1, 0.1, 3]
+measured_device = False
+if measured_device:
+    LJ1 = 0.35e-9*1
+    LJ2 = 0.5e-9*1
+    alpha = LJ1/LJ2
+    w0, wa, LJ, N, alpha, n = [8.1*1e9*2*np.pi, 7.5*1e9*2*np.pi, LJ1, 1, alpha, 1]
 # High
 #w0, wa, LJ, N, alpha, n = [14.89*1e9*2*np.pi, 6.2*1e9*2*np.pi, 0.1e-9, 20, 0.1, 3]
 
 LJeq = N*(1/(1/(LJ*n)+ 1/(LJ/alpha)))
-EC, EL, EJeq = circuit.get_E_from_w0_wa_LJ(w0, wa, LJeq)
+print('LJeq = %s nH' % str(LJeq/1e-9))
 
+EC, EL, EJeq = circuit.get_E_from_w0_wa_LJ(w0, wa, LJeq)
+LG = phi0**2/EL
+C = e**2/2/EC
+print('LG = %s nH' % str(LG/1e-9))
+print('Z = sqrt((LG+LJ)/C) = %s Ohm' % str(np.sqrt((LG+LJeq)/C)))
 #EC, EL, _ = circuit.get_E_from_w(4.45*1e9*2*np.pi, 50, 1)
 #EC2, EL2, _ = circuit.get_E_from_w(6*1e9*2*np.pi,50, 1)
 
@@ -40,9 +60,9 @@ EJ = phi0**2/LJ
 ECJ = EC*10
 c = cspa.CircuitSPA(EL, EJ, EC, ECJ, N, n, alpha)
 
-min_phi = -2*pi
-max_phi = 2*pi
-Npts = 201
+min_phi = -2*pi+0*pi/10
+max_phi = 2*pi-0*pi/10
+Npts = 101
 phiVec = np.linspace(min_phi, max_phi, Npts)
 ng_sweep = np.linspace(-1, 1, 21)
 
@@ -88,7 +108,10 @@ if 1==1:
     ax[0,3].semilogy(Xi2[0,:]/1e9, np.abs(Xi3[0,:]/Xi4[0,:])/2)
     ax[0,3].semilogy([fmin, fmax], [10,10])
     ax[0,3].semilogy([fmin, fmax], [100,100])
-    ax[0,3].set_ylim([5,np.max(np.abs(Xi3[0,:]/Xi4[0,:])/2)])
+    try:
+        ax[0,3].set_ylim([5,np.max(np.abs(Xi3[0,:]/Xi4[0,:])/2)])
+    except:
+        pass
 
 
     ax[1,0].set_title('frequency (GHz)')

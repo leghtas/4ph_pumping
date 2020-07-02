@@ -67,7 +67,7 @@ def get_E_from_w(w, Z, LJ):
     return EC, EL, EJ
 
 
-def get_E_from_w0_wa_LJ(w0, wa, LJ):
+def get_E_from_w0_wa_LJ(w0, wa, LJ): # w0 is frequency of mode when LJ = 0
     C = (1/wa**2-1/w0**2)/LJ
     L = 1/w0**2/C
     EL = phi0**2/L
@@ -182,10 +182,10 @@ class Circuit(object):
     
     def prepare_U_formal(self): 
         U_expr = parse_expr(self.U_str, evaluate=False)
-        print('U = '+str(U_expr))
+        #print('U = '+str(U_expr))
         U_expr_symbols = get_symbol_list(U_expr)
         self.U_variables = self.remove_params(U_expr_symbols)
-        print('Detected U variables : '+str(self.U_variables))
+        #print('Detected U variables : '+str(self.U_variables))
         self.dim = len(self.U_variables)
 
         U_expr_sub = U_expr.subs(self.__dict__)
@@ -194,10 +194,10 @@ class Circuit(object):
     def prepare_T_formal(self): 
         
         T_expr = parse_expr(self.T_str, evaluate=False)
-        print('T = '+str(T_expr))
+        #print('T = '+str(T_expr))
         T_expr_symbols = get_symbol_list(T_expr)
         self.T_variables = self.remove_params(T_expr_symbols)
-        print('Detected T variables : '+str(self.T_variables))
+        #print('Detected T variables : '+str(self.T_variables))
         self.dim = len(self.T_variables)
 
         T_expr_sub = T_expr.subs(self.__dict__)
@@ -441,8 +441,8 @@ class Circuit(object):
                 x0 = np.array([res.x])
             HessU = self.get_HessnL('U', 2, **kwargs)
             quad = x0, HessU(x0)
-            print('res get_U_matrix')
-            print(x0)
+            #print('res get_U_matrix')
+            #print(x0)
 
         else:
             quad = self.get_quadratic_form(U) # not suported anymore
@@ -480,8 +480,8 @@ class Circuit(object):
     def get_freqs_kerrs(self, particulars=None, return_components=False, max_solutions=1, sort=False, **kwargs): #particulars should be list of tuple
         res = self.get_normal_mode_frame(sort=False, **kwargs)
         res1s, res2, Ps, w2s = res
-        print('res1 get_freqs_kerr')
-        print(res1s)
+        #print('res1 get_freqs_kerr')
+        #print(res1s)
         res1s = list(res1s)
         Ps = list(Ps)
         
@@ -635,7 +635,7 @@ class Circuit(object):
             self.permutations = permute([ii for ii in range(dim)])
         else:
             to_compare = np.eye(dim)
-#            to_compare = to_compares[jj]
+#            to_compare = to_compares[jj]get_U_matrix
             
         distances = []
         sgns = []

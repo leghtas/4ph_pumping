@@ -19,16 +19,17 @@ Phi0 = sc.value('mag. flux quantum')
 e = sc.elementary_charge
 phi0 = Phi0/2/np.pi  # Phi_0=h/(2*e)
 
-plt.close('all')
+#plt.close('all')
 #LJ = 1.32e-08
 #I0 = 7.1*1e-6 #A EJ=phi0*I0
 
 # Low
-w0, wa, LJ, N, alpha, n = [10.53*1e9*2*np.pi, 4.7*1e9*2*np.pi, 0.1e-9, 20, 0.1, 3]
+w0, wa, LJ, N, alpha, n = [15*1e9*2*np.pi, 9.2*1e9*2*np.pi, 0.043e-9, 20, 0.1, 3]
 # High
 #w0, wa, LJ, N, alpha, n = [14.89*1e9*2*np.pi, 6.2*1e9*2*np.pi, 0.1e-9, 20, 0.1, 3]
 
 LJeq = N*(1/(1/(LJ*n)+ 1/(LJ/alpha)))
+print('LJeq = %s ' % str(LJeq/1e-9))
 EC, EL, EJeq = circuit.get_E_from_w0_wa_LJ(w0, wa, LJeq)
 
 #EC, EL, _ = circuit.get_E_from_w(4.45*1e9*2*np.pi, 50, 1)

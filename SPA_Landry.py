@@ -24,11 +24,12 @@ plt.close('all')
 #I0 = 7.1*1e-6 #A EJ=phi0*I0
 
 # Low
-w0, wa, LJ, N, alpha, n = [10.53*1e9*2*np.pi, 4.7*1e9*2*np.pi, 0.1e-9, 20, 0.1, 3]
+w0, wa, LJ, N, alpha, n = [15*1e9*2*np.pi, 6.2*1e9*2*np.pi, 0.043e-9, 20, 0.1, 2]
 # High
 #w0, wa, LJ, N, alpha, n = [14.89*1e9*2*np.pi, 6.2*1e9*2*np.pi, 0.1e-9, 20, 0.1, 3]
 
 LJeq = N*(1/(1/(LJ*n)+ 1/(LJ/alpha)))
+print('LJeq = %s ' % str(LJeq/1e-9))
 EC, EL, EJeq = circuit.get_E_from_w0_wa_LJ(w0, wa, LJeq)
 
 #EC, EL, _ = circuit.get_E_from_w(4.45*1e9*2*np.pi, 50, 1)
@@ -40,9 +41,9 @@ EJ = phi0**2/LJ
 ECJ = EC*10
 c = cspa.CircuitSPA(EL, EJ, EC, ECJ, N, n, alpha)
 
-min_phi = -2*pi
-max_phi = 2*pi
-Npts = 201
+min_phi = -1*pi
+max_phi = 1*pi
+Npts = 101
 phiVec = np.linspace(min_phi, max_phi, Npts)
 ng_sweep = np.linspace(-1, 1, 21)
 
