@@ -25,6 +25,9 @@ phi0 = Phi0/2/np.pi  # Phi_0=h/(2*e)
 plt.close('all')
 
 wa, LJ, N, alpha, n = [8*1e9*2*np.pi, 0.1e-9, 1, 0.2, 3]
+
+wa, LJ, N, alpha, n = [8.3*1e9*2*np.pi, 0.13e-9, 1, 0.25, 3]
+# LJ of large junction
 #wa, LJ, N, alpha, n = [8*1e9*2*np.pi, 0.3e-9, 1, 0.6, 1]
 
 LJeq = N*(1/(1/(LJ*n)+ 1/(LJ/alpha)))
@@ -131,7 +134,7 @@ if 1:
     ax[1].grid(c='lightgrey')
     ax[0].set_ylim([4.9,8])
     ax[1].set_ylim([-20,20])
-    ax[2].set_ylim([-0.5,0.5])
+    ax[2].set_ylim([-2,2])
 
     ax[1].set_ylabel(r'$g3/2\pi$ (MHz)')
     ax[1].set_xlabel(r'$\phi_{ext}/\varphi_0$')
